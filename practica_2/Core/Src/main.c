@@ -31,6 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define LED_BLINK_TIEMPO_MS  100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -65,8 +66,14 @@ static void MX_USART2_UART_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  uint32_t tiempo = 200;
-  GPIO_PinState last_b1 = GPIO_PIN_SET;   /* no presionado */
+  delay_t estructura_delay;
+  uint32_t periodos[] = {1000, 200, 100};
+  uint8_t  repeticiones[] = {5, 5, 5};
+  uint8_t  n_patrones = sizeof(periodos) / sizeof(periodos[0]);
+
+  uint8_t cuenta_toggle = 0;
+  uint8_t patronIdx = 0;
+
 
   /* USER CODE END 1 */
 
@@ -95,37 +102,77 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  /*Se divide por 2 ya que la consigna indica periodo y 50% de duty*/
+  delayInit(&estructura_delay, periodos[patronIdx] / 2);
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
-	  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-	  HAL_Delay(tiempo);
-	  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-	  HAL_Delay(tiempo);
+	  if (delayRead(&estructura_delay))
+	      {
+	        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	        cuenta_toggle++;
 
-	  GPIO_PinState b1_now = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
+	        /*Se multiplica por 2 ya que un blink son dos toggleos*/
+	        if (cuenta_toggle >= repeticiones[patronIdx] * 2)
+	        {
+	          cuenta_toggle = 0;
 
-	  if (b1_now == GPIO_PIN_RESET && last_b1 == GPIO_PIN_SET)
-	  {
-		  if (tiempo == 200)
-		  {
-			  tiempo = 500;
-		  }
-		  else
-		  {
-			  tiempo = 200;
-		  }
-	  }
+	          /*Se automatiza recorrer la cantidad de patrones declarados*/
+	          patronIdx++;
+	          if (patronIdx == n_patrones)
+	          {
+	              patronIdx = 0;
+	          }
 
-	  last_b1 = b1_now;
-
+	          delayWrite(&estructura_delay, periodos[patronIdx] / 2);
+	        }
+	      }
 
   }
   /* USER CODE END 3 */
 }
+
+
+
+void delayInit(delay_t * delay, tick_t duration)
+{
+    delay->duration = duration;
+    delay->running = false;
+}
+
+
+
+bool_t delayRead(delay_t * delay)
+{
+    if (!delay->running)
+    {
+        delay->startTime = HAL_GetTick();
+        delay->running = true;
+        return false;
+    }
+
+    if ((HAL_GetTick() - delay->startTime) >= delay->duration)
+    {
+        delay->running = false;
+        return true;
+    }
+
+    return false;
+}
+
+
+
+void delayWrite(delay_t * delay, tick_t duration)
+{
+    delay->duration = duration;
+}
+
+
 
 /**
   * @brief System Clock Configuration

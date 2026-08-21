@@ -31,6 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define LED_BLINK_TIEMPO_MS  100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -65,8 +66,7 @@ static void MX_USART2_UART_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  uint32_t tiempo = 200;
-  GPIO_PinState last_b1 = GPIO_PIN_SET;   /* no presionado */
+  delay_t estructura_delay;
 
   /* USER CODE END 1 */
 
@@ -95,37 +95,60 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  delayInit(&estructura_delay,LED_BLINK_TIEMPO_MS);
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
-	  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-	  HAL_Delay(tiempo);
-	  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-	  HAL_Delay(tiempo);
-
-	  GPIO_PinState b1_now = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
-
-	  if (b1_now == GPIO_PIN_RESET && last_b1 == GPIO_PIN_SET)
+	  if (delayRead(&estructura_delay))
 	  {
-		  if (tiempo == 200)
-		  {
-			  tiempo = 500;
-		  }
-		  else
-		  {
-			  tiempo = 200;
-		  }
+		  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 	  }
-
-	  last_b1 = b1_now;
-
 
   }
   /* USER CODE END 3 */
 }
+
+
+
+void delayInit(delay_t * delay, tick_t duration)
+{
+    delay->duration = duration;
+    delay->running = false;
+}
+
+
+
+bool_t delayRead(delay_t * delay)
+{
+    if (!delay->running)
+    {
+        delay->startTime = HAL_GetTick();
+        delay->running = true;
+        return false;
+    }
+
+    if ((HAL_GetTick() - delay->startTime) >= delay->duration)
+    {
+        delay->running = false;
+        return true;
+    }
+
+    return false;
+}
+
+
+
+void delayWrite(delay_t * delay, tick_t duration)
+{
+    delay->duration = duration;
+}
+
+
 
 /**
   * @brief System Clock Configuration
