@@ -26,11 +26,45 @@ typedef struct {
 ## Detalle de funciones
 
 ### `void delayInit(delay_t * delay, tick_t duration)`
+
+```c
+/**
+ * @brief  Inicializa una estructura de retardo no bloqueante.
+ *         Carga la duración solicitada y deja el retardo detenido
+ *         (running = false); el conteo del tiempo recién arranca
+ *         en la primera llamada a delayRead.
+ *
+ * @param  delay    Puntero a la estructura delay_t a inicializar.
+ * @param  duration Duración del retardo, en milisegundos.
+ *
+ * @retval Ninguno (void). Si delay es NULL, la función no hace nada.
+ *         Si duration es 0, se ignora ese valor (no se carga) pero
+ *         igual se deja el retardo inicializado con running = false.
+ */
+```
+
 Inicializa una estructura `delay_t`: carga la duración solicitada y pone `running` en
 `false`. **No** inicia el conteo del tiempo — eso ocurre recién en la primera llamada a
 `delayRead`.
 
 ### `bool_t delayRead(delay_t * delay)`
+
+```c
+/**
+ * @brief  Verifica si se cumplió el tiempo configurado en un retardo
+ *         no bloqueante. Debe llamarse repetidamente (polling) dentro
+ *         del loop principal; no bloquea la ejecución en ningún caso.
+ *
+ * @param  delay Puntero a la estructura delay_t a evaluar.
+ *
+ * @retval bool_t  true  si se cumplió el tiempo configurado (y reinicia
+ *                        el ciclo para la próxima llamada).
+ *                 false si el tiempo todavía no se cumplió, si el
+ *                        retardo recién arranca a correr, o si delay
+ *                        es NULL (puntero inválido).
+ */
+```
+
 Función central del módulo, pensada para llamarse repetidamente dentro de un loop
 (polling), sin bloquear:
 
@@ -42,8 +76,42 @@ Función central del módulo, pensada para llamarse repetidamente dentro de un l
     llamada) y devuelve `true`.
 
 ### `void delayWrite(delay_t * delay, tick_t duration)`
+
+```c
+/**
+ * @brief  Cambia la duración de un retardo ya existente, sin alterar
+ *         su estado running actual (si estaba corriendo, sigue
+ *         corriendo con la nueva duración).
+ *
+ * @param  delay    Puntero a la estructura delay_t a modificar.
+ * @param  duration Nueva duración del retardo, en milisegundos.
+ *
+ * @retval Ninguno (void). Si delay es NULL, o si duration es 0,
+ *         la función no hace nada y se conserva la duración anterior.
+ */
+```
+
 Permite cambiar la duración de un delay ya existente, sin afectar su estado `running`
 actual.
+
+## Validación de parámetros
+
+Las tres funciones controlan los parámetros recibidos antes de operar sobre ellos:
+
+- **Puntero `delay` nulo:** todas verifican `delay == NULL` antes de acceder a sus
+  campos. Si el puntero es inválido, `delayInit` y `delayWrite` no hacen nada
+  (`return` inmediato), y `delayRead` devuelve `false`. Esto evita un acceso a
+  memoria inválido (posible HardFault) si alguna función se llama por error sin
+  una estructura válida.
+- **`duration == 0`:** no tiene sentido físico un retardo de 0 ms, por lo que tanto
+  `delayInit` como `delayWrite` ignoran ese valor y no lo cargan en la estructura.
+  En `delayInit`, el flag `running` igualmente se deja en `false` para que la
+  estructura no quede en un estado indefinido, aunque la duración no se haya
+  podido cargar.
+
+*Nota: esta validación se implementó y compiló correctamente, pero no se probó aún
+de forma exhaustiva con parámetros inválidos (puntero NULL o duración 0) en la
+placa física.*
 
 ## Explicación breve del código (`main.c`)
 
@@ -61,6 +129,8 @@ while (1)
   }
 }
 ```
+
+
 
 El `while(1)` da vueltas libremente sin ningún `HAL_Delay` bloqueante. `delayRead`
 devuelve `true` únicamente en el instante puntual en que se cumplen los 100 ms
