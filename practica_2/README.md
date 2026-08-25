@@ -118,12 +118,12 @@ placa física.*
 **Punto 2 — Blink 100 ms ON / 100 ms OFF:**
 
 ```c
-delay_t delayLed;
-delayInit(&delayLed, 100);
+delay_t estructura_delay;
+delayInit(&estructura_delay, 100);
 
 while (1)
 {
-  if (delayRead(&delayLed))
+  if (delayRead(&estructura_delay))
   {
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
   }
@@ -144,15 +144,15 @@ uint32_t periodos[]     = {1000, 200, 100};
 uint8_t  repeticiones[] = {5, 5, 5};
 uint8_t  n_patrones = sizeof(periodos) / sizeof(periodos[0]);
 
-delay_t delayLed;
+delay_t estructura_delay;
 uint8_t patronIdx = 0;
 uint8_t cuenta_toggle = 0;
 
-delayInit(&delayLed, periodos[patronIdx] / 2);
+delayInit(&estructura_delay, periodos[patronIdx] / 2);
 
 while (1)
 {
-  if (delayRead(&delayLed))
+  if (delayRead(&estructura_delay))
   {
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     cuenta_toggle++;
@@ -168,7 +168,7 @@ while (1)
         patronIdx = 0;
       }
 
-      delayWrite(&delayLed, periodos[patronIdx] / 2);
+      delayWrite(&estructura_delay, periodos[patronIdx] / 2);
     }
   }
 }
