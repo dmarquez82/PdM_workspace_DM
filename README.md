@@ -2,7 +2,7 @@
 
 Repositorio de Trabajos Prácticos de la materia **Programación de Microcontroladores**,
 
-**Carrera:** Especialización en Sistemas Embebidos.
+**Carrera:** Especialización en Sistemas Embebidos - FIUBA
 
 **Profesor:** Mg. Ing. Patricio Bos
 
