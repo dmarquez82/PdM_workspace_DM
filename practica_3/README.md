@@ -1,4 +1,4 @@
-# Práctica 2: Delays no bloqueantes
+# Práctica 3: Modularización
 
 **Materia:** Programación de Microcontroladores
 **Estudiante:** Prof. Ing. Daniel Márquez
@@ -6,188 +6,153 @@
 
 ## Objetivo
 
-Implementar un módulo de software para el manejo de retardos no bloqueantes basado en
-`HAL_GetTick()`, y utilizarlo para generar patrones de parpadeo del LED de usuario (LD2)
-sin bloquear la ejecución del programa principal.
+Modularizar el código de retardos no bloqueantes desarrollado en la Práctica 2,
+encapsulándolo en una API propia (`API_delay.c` / `API_delay.h`), e implementar una
+secuencia de parpadeo con tiempos variables a partir de una tabla.
 
-## Estructura de datos
+## Estructura del proyecto
+
+```
+Practica_3/
+├── Core/
+│   ├── Inc/        (main.h, stm32f4xx_hal_conf.h, etc.)
+│   └── Src/        (main.c, stm32f4xx_it.c, etc.)
+├── Drivers/
+│   ├── API/
+│   │   ├── Inc/
+│   │   │   └── API_delay.h
+│   │   └── Src/
+│   │       └── API_delay.c
+│   ├── BSP/
+│   ├── CMSIS/
+│   └── STM32F4xx_HAL_Driver/
+```
+
+*Nota:* la carpeta `Drivers/API/Inc` debe agregarse al **include path** del proyecto
+(clic derecho sobre la carpeta → `Add/remove include path...`) para que el compilador
+encuentre `API_delay.h` al incluirlo desde `main.c`.
+
+## `API_delay.h` — Estructura de datos
 
 ```c
 typedef uint32_t tick_t;
 typedef bool bool_t;
 
 typedef struct {
-    tick_t startTime;   // marca de tiempo en la que arrancó el conteo
-    tick_t duration;    // duración configurada del retardo, en ms
-    bool_t running;     // indica si el retardo está corriendo actualmente
+    tick_t startTime;
+    tick_t duration;
+    bool_t running;
 } delay_t;
 ```
 
 ## Detalle de funciones
 
 ### `void delayInit(delay_t * delay, tick_t duration)`
-
-```c
-/**
- * @brief  Inicializa una estructura de retardo no bloqueante.
- *         Carga la duración solicitada y deja el retardo detenido
- *         (running = false); el conteo del tiempo recién arranca
- *         en la primera llamada a delayRead.
- *
- * @param  delay    Puntero a la estructura delay_t a inicializar.
- * @param  duration Duración del retardo, en milisegundos.
- *
- * @retval Ninguno (void). Si delay es NULL, la función no hace nada.
- *         Si duration es 0, se ignora ese valor (no se carga) pero
- *         igual se deja el retardo inicializado con running = false.
- */
-```
-
 Inicializa una estructura `delay_t`: carga la duración solicitada y pone `running` en
-`false`. **No** inicia el conteo del tiempo — eso ocurre recién en la primera llamada a
+`false`. No inicia el conteo del tiempo — eso ocurre recién en la primera llamada a
 `delayRead`.
 
 ### `bool_t delayRead(delay_t * delay)`
-
-```c
-/**
- * @brief  Verifica si se cumplió el tiempo configurado en un retardo
- *         no bloqueante. Debe llamarse repetidamente (polling) dentro
- *         del loop principal; no bloquea la ejecución en ningún caso.
- *
- * @param  delay Puntero a la estructura delay_t a evaluar.
- *
- * @retval bool_t  true  si se cumplió el tiempo configurado (y reinicia
- *                        el ciclo para la próxima llamada).
- *                 false si el tiempo todavía no se cumplió, si el
- *                        retardo recién arranca a correr, o si delay
- *                        es NULL (puntero inválido).
- */
-```
-
 Función central del módulo, pensada para llamarse repetidamente dentro de un loop
 (polling), sin bloquear:
-
 - Si `running == false`: toma la marca de tiempo actual (`HAL_GetTick()`) como
-  `startTime`, pone `running = true`, y devuelve `false` (recién arranca el conteo).
-- Si `running == true`: compara `HAL_GetTick() - startTime` contra `duration`.
-  - Si todavía no se cumplió el tiempo, devuelve `false`.
-  - Si ya se cumplió, pone `running = false` (reinicia el ciclo para la próxima
-    llamada) y devuelve `true`.
+  `startTime`, pone `running = true`, y devuelve `false`.
+- Si `running == true`: compara `HAL_GetTick() - startTime` contra `duration`. Si se
+  cumplió, pone `running = false` y devuelve `true`; si no, devuelve `false`.
 
 ### `void delayWrite(delay_t * delay, tick_t duration)`
+Cambia la duración de un delay ya existente, sin alterar su `running` actual. Se
+recomienda verificar con `delayIsRunning` que el delay no esté corriendo antes de
+llamarla, para evitar alterar un conteo en curso con una duración inconsistente.
 
-```c
-/**
- * @brief  Cambia la duración de un retardo ya existente, sin alterar
- *         su estado running actual (si estaba corriendo, sigue
- *         corriendo con la nueva duración).
- *
- * @param  delay    Puntero a la estructura delay_t a modificar.
- * @param  duration Nueva duración del retardo, en milisegundos.
- *
- * @retval Ninguno (void). Si delay es NULL, o si duration es 0,
- *         la función no hace nada y se conserva la duración anterior.
- */
-```
-
-Permite cambiar la duración de un delay ya existente, sin afectar su estado `running`
-actual.
+### `bool_t delayIsRunning(delay_t * delay)` *(nueva, Punto 3)*
+Devuelve una copia del campo `running`, sin modificar la estructura. Permite consultar
+desde afuera si un delay está corriendo antes de decidir reconfigurarlo con
+`delayWrite`.
 
 ## Validación de parámetros
 
-Las tres funciones controlan los parámetros recibidos antes de operar sobre ellos:
+Las cuatro funciones controlan los parámetros recibidos antes de operar sobre ellos:
 
-- **Puntero `delay` nulo:** todas verifican `delay == NULL` antes de acceder a sus
-  campos. Si el puntero es inválido, `delayInit` y `delayWrite` no hacen nada
-  (`return` inmediato), y `delayRead` devuelve `false`. Esto evita un acceso a
-  memoria inválido (posible HardFault) si alguna función se llama por error sin
-  una estructura válida.
-- **`duration == 0`:** no tiene sentido físico un retardo de 0 ms, por lo que tanto
-  `delayInit` como `delayWrite` ignoran ese valor y no lo cargan en la estructura.
-  En `delayInit`, el flag `running` igualmente se deja en `false` para que la
-  estructura no quede en un estado indefinido, aunque la duración no se haya
-  podido cargar.
+- **Puntero `delay` nulo:** se verifica `delay == NULL` antes de acceder a sus campos.
+  Si es inválido, `delayInit` y `delayWrite` no hacen nada; `delayRead` y
+  `delayIsRunning` devuelven `false`.
+- **`duration == 0`:** no tiene sentido físico un retardo de 0 ms, por lo que
+  `delayInit` y `delayWrite` ignoran ese valor y no lo cargan en la estructura.
+  En `delayInit`, el flag `running` igual se deja en `false` para no dejar la
+  estructura en un estado indefinido.
 
-*Nota: esta validación se implementó y compiló correctamente, pero no se probó aún
-de forma exhaustiva con parámetros inválidos (puntero NULL o duración 0) en la
-placa física.*
+## Explicación del código (`main.c`) — Punto 2 y 3
 
-## Explicación breve del código (`main.c`)
-
-**Punto 2 — Blink 100 ms ON / 100 ms OFF:**
+Secuencia de tiempos de encendido, con duty 50%:
 
 ```c
-delay_t delayLed;
-delayInit(&delayLed, 100);
-
-while (1)
-{
-  if (delayRead(&delayLed))
-  {
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-  }
-}
-```
-
-
-
-El `while(1)` da vueltas libremente sin ningún `HAL_Delay` bloqueante. `delayRead`
-devuelve `true` únicamente en el instante puntual en que se cumplen los 100 ms
-configurados; el `if` aprovecha esa señal para togglear el LED solo en ese momento,
-evitando que se togglee en cada vuelta del loop.
-
-**Punto 3 (opcional) — Patrón de 3 tandas:**
-
-```c
-uint32_t periodos[]     = {1000, 200, 100};
-uint8_t  repeticiones[] = {5, 5, 5};
-uint8_t  n_patrones = sizeof(periodos) / sizeof(periodos[0]);
-
-delay_t delayLed;
-uint8_t patronIdx = 0;
+const uint32_t TIEMPOS[] = {500, 100, 100, 1000};
+uint8_t n_tiempos = sizeof(TIEMPOS) / sizeof(TIEMPOS[0]);
+uint8_t idx = 0;
 uint8_t cuenta_toggle = 0;
 
-delayInit(&delayLed, periodos[patronIdx] / 2);
+delay_t estructura_delay;
+delayInit(&estructura_delay, TIEMPOS[idx]);
 
 while (1)
 {
-  if (delayRead(&delayLed))
+  if (delayRead(&estructura_delay))
   {
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     cuenta_toggle++;
 
-    /* Se multiplica por 2 ya que un blink son dos toggleos */
-    if (cuenta_toggle >= repeticiones[patronIdx] * 2)
+    if (cuenta_toggle >= 2)
     {
       cuenta_toggle = 0;
 
-      patronIdx++;
-      if (patronIdx == n_patrones)
+      idx++;
+      if (idx == n_tiempos)
       {
-        patronIdx = 0;
+        idx = 0;
       }
 
-      delayWrite(&delayLed, periodos[patronIdx] / 2);
+      if (!delayIsRunning(&estructura_delay))
+      {
+        delayWrite(&estructura_delay, TIEMPOS[idx]);
+      }
     }
   }
 }
 ```
 
-- Se togglea el LED cada **medio período**, lo que genera automáticamente un duty
-  cycle del 50% sin necesidad de manejar el tiempo ON y OFF por separado.
-- `cuenta_toggle` cuenta los toggles dentro de la tanda actual. Como cada blink
-  completo equivale a 2 toggles, se compara contra `repeticiones[patronIdx] * 2`.
-- Al completarse la tanda, se avanza `patronIdx` a la siguiente posición del
-  patrón, reiniciando a 0 si se llegó al final del arreglo (patrón cíclico), y se
-  reconfigura el delay con `delayWrite` según el nuevo período.
+- Se usa una **única variable `delay_t`** (`estructura_delay`) para toda la secuencia, tal como
+  pide la consigna, reconfigurando su duración con `delayWrite` en lugar de crear un
+  delay distinto por cada tiempo.
+- `TIEMPOS[]` contiene el tiempo de **encendido** de cada tramo; como se pide duty
+  50%, cada valor debe usarse dos veces seguidas (una para el ON, otra para el OFF)
+  antes de pasar al siguiente. Por eso se cuenta con `cuenta_toggle` y solo se avanza
+  `idx` cuando se completaron los 2 toggles (ON + OFF) del tramo actual.
+- Antes de reconfigurar el tiempo con `delayWrite`, se verifica con
+  `delayIsRunning(&delayLed)` que el delay no esté corriendo — en este punto del
+  código nunca lo está (porque `delayRead` ya puso `running = false` al devolver
+  `true`), pero se deja el chequeo como buena práctica defensiva, tal como pide el
+  Punto 3.
 
-## Patrón implementado (Punto 3)
+## Puntos para pensar (reflexión de la consigna)
 
-| Tanda | Período | Ciclo de trabajo | Repeticiones |
-|-------|---------|------------------|--------------|
-| 1     | 1000 ms | 50%              | 5            |
-| 2     | 200 ms  | 50%              | 5            |
-| 3     | 100 ms  | 50%              | 5            |
-
-El patrón se repite en forma indefinida.
+- **Claridad de la consigna del Punto 2:** el enunciado indica que los tiempos son
+  "de encendido" y que el duty debe ser 50%, pero no aclara explícitamente que cada
+  tiempo deba repetirse para el ON y el OFF antes de avanzar al siguiente. Una lectura
+  apresurada podría llevar a consumir la tabla linealmente (un valor por semiciclo),
+  lo cual **no** cumple el 50% de duty para cada tramo — es el error que se detectó y
+  corrigió durante la implementación.
+- **Números mágicos:** el `2` usado para comparar `cuenta_toggle >= 2` representa "un
+  blink completo son 2 toggles" — podría nombrarse con una constante para mayor
+  claridad, aunque en este caso el comentario en el código cumple una función similar.
+  El array `TIEMPOS[]` en sí es la forma correcta de evitar hardcodear los tiempos:
+  cambiarlos o agregar un tramo nuevo solo requiere modificar esa única línea.
+- **Bibliotecas estándar:** `<stdint.h>` (para `uint32_t`/`tick_t`) y `<stdbool.h>`
+  (para `bool`/`bool_t`), incluidas en `API_delay.h`. Si la API creciera con más
+  módulos que reutilicen estos mismos typedefs, convendría moverlos a un header común
+  (por ejemplo `tipos.h`) para no obligar a otros módulos a depender de
+  `API_delay.h` únicamente para acceder a `tick_t`/`bool_t`.
+- **Control de parámetros:** las cuatro funciones de la API validan puntero `NULL` y
+  `duration == 0` (ver sección de validación arriba). No se agregó validación sobre
+  `idx` en `main.c` más allá del propio manejo cíclico del índice, dado que
+  `n_tiempos` se calcula automáticamente a partir del tamaño del array.
