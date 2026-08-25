@@ -129,7 +129,7 @@ while (1)
   antes de pasar al siguiente. Por eso se cuenta con `cuenta_toggle` y solo se avanza
   `idx` cuando se completaron los 2 toggles (ON + OFF) del tramo actual.
 - Antes de reconfigurar el tiempo con `delayWrite`, se verifica con
-  `delayIsRunning(&delayLed)` que el delay no esté corriendo — en este punto del
+  `delayIsRunning(&estructura_delay)` que el delay no esté corriendo — en este punto del
   código nunca lo está (porque `delayRead` ya puso `running = false` al devolver
   `true`), pero se deja el chequeo como buena práctica defensiva, tal como pide el
   Punto 3.
