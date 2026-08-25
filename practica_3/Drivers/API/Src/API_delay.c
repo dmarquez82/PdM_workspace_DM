@@ -95,4 +95,21 @@ void delayWrite(delay_t * delay, tick_t duration)
 }
 
 
+/**
+ * @brief  Devuelve una copia del estado running de un retardo,
+ *         sin modificar la estructura.
+ *
+ * @param  delay Puntero a la estructura delay_t a consultar.
+ *
+ * @retval bool_t true si el retardo está corriendo actualmente,
+ *                false si no está corriendo, o si delay es NULL.
+ */
+bool_t delayIsRunning(delay_t * delay)
+{
+    if (delay == NULL)
+    {
+        return false;
+    }
 
+    return delay->running;
+}

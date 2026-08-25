@@ -112,7 +112,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	  if (delayRead(&estructura_delay))
-	    {
+	  {
 	      HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 	      cuenta_toggle++;
 
@@ -126,7 +126,10 @@ int main(void)
 	          idx = 0;
 	        }
 
-	        delayWrite(&estructura_delay, TIEMPOS[idx]);
+	        if (!delayIsRunning(&estructura_delay))
+	        {
+	          delayWrite(&estructura_delay, TIEMPOS[idx]);
+	        }
 	      }
 	    }
 
