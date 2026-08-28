@@ -107,8 +107,12 @@ int main(void)
 	  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 	  HAL_Delay(tiempo);
 
+	  /*Detecta estado actual del pulsador*/
 	  b1_now = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
 
+	  /*Verifica que el pulsador se haya dejado de presionar y vuelto a
+	   * pulsar para validar un evento de pulsado
+	  */
 	  if (b1_now == GPIO_PIN_RESET && last_b1 == GPIO_PIN_SET)
 	  {
 		  if (tiempo == 200)
@@ -121,6 +125,8 @@ int main(void)
 		  }
 	  }
 
+	  /*Guarda en variable auxiliar el estado actual del pulsador, para que
+	   * sea guardado como estado anterior*/
 	  last_b1 = b1_now;
 
 
