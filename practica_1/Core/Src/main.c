@@ -67,6 +67,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
   uint32_t tiempo = 200;
   GPIO_PinState last_b1 = GPIO_PIN_SET;   /* no presionado */
+  GPIO_PinState b1_now;
 
   /* USER CODE END 1 */
 
@@ -106,7 +107,7 @@ int main(void)
 	  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 	  HAL_Delay(tiempo);
 
-	  GPIO_PinState b1_now = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
+	  b1_now = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
 
 	  if (b1_now == GPIO_PIN_RESET && last_b1 == GPIO_PIN_SET)
 	  {
