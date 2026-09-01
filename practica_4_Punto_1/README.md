@@ -109,5 +109,6 @@ vuelta del `while(1)`, sin ningún delay entre llamadas — esto maximiza la
 resolución de detección de flancos. Si se llamara con un período mucho más
 grande, se correría el riesgo de no detectar pulsaciones muy cortas; con un
 período mucho más chico no habría inconveniente funcional, salvo el consumo de
-ciclos de CPU en llamadas sucesivas.
+ciclos de CPU en llamadas sucesivas. Pero si se acorta mucho puede dejar de
+servir el antirebote en si.
 
