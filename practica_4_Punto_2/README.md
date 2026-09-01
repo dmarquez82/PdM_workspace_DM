@@ -1,7 +1,9 @@
 # Práctica 4 - Punto 2: Modularización del antirrebote (API_debounce)
 
 **Materia:** Programación de Microcontroladores
+
 **Estudiante:** Prof. Ing. Daniel Márquez
+
 **Placa:** NUCLEO-F446RE
 
 ## Objetivo
