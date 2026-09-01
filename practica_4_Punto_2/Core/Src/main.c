@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "API_delay.h"
+#include "API_debounce.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -52,8 +53,6 @@ typedef enum {
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-debounceState_t estadoActual;
-delay_t debounceDelay;
 
 /* USER CODE END PV */
 
@@ -113,7 +112,7 @@ int main(void)
 
   /* Enciendo LED2 */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-  debounceFSM_init();
+
 
   while (1)
   {
@@ -121,124 +120,11 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  /*Llamado a la función MEF de debounce*/
-	  debounceFSM_update();
-
 
   }
   /* USER CODE END 3 */
 }
 
-
-
-/**
- * @brief  Inicializa la MEF de antirrebote en su estado inicial
- *         (BUTTON_UP), y prepara el retardo no bloqueante interno
- *         que usa la MEF para confirmar los flancos.
- *
- * @param  Ninguno.
- * @retval Ninguno.
- */
-void debounceFSM_init(void)
-{
-  estadoActual = BUTTON_UP;
-  delayInit(&debounceDelay, DEBOUNCE_TIME_MS);
-}
-
-
-
-/**
- * @brief  Evento que se dispara al confirmarse una pulsación real
- *         del botón (flanco descendente confirmado tras el
- *         antirrebote). Enciende el LED de usuario.
- *
- * @param  Ninguno.
- * @retval Ninguno.
- */
-void buttonPressed(void)
-{
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-}
-
-
-
-/**
- * @brief  Evento que se dispara al confirmarse la liberación real
- *         del botón (flanco ascendente confirmado tras el
- *         antirrebote). Apaga el LED de usuario.
- *
- * @param  Ninguno.
- * @retval Ninguno.
- */
-void buttonReleased(void)
-{
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-}
-
-
-
-/**
- * @brief  Actualiza la MEF de antirrebote: lee el estado del
- *         pulsador B1, resuelve las transiciones de estado
- *         correspondientes, y dispara los eventos buttonPressed/
- *         buttonReleased cuando corresponde. Debe llamarse
- *         periódicamente dentro del loop principal.
- *
- * @param  Ninguno.
- * @retval Ninguno.
- */
-void debounceFSM_update(void)
-{
-  switch (estadoActual)
-  {
-    case BUTTON_UP:
-      if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
-      {
-        estadoActual = BUTTON_FALLING;
-      }
-      break;
-
-    case BUTTON_FALLING:
-      if (delayRead(&debounceDelay))
-      {
-        if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
-        {
-          estadoActual = BUTTON_DOWN;
-          buttonPressed();
-        }
-        else
-        {
-          estadoActual = BUTTON_UP;
-        }
-      }
-      break;
-
-    case BUTTON_DOWN:
-      if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET)
-      {
-        estadoActual = BUTTON_RISING;
-      }
-      break;
-
-    case BUTTON_RISING:
-      if (delayRead(&debounceDelay))
-      {
-        if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET)
-        {
-          estadoActual = BUTTON_UP;
-          buttonReleased();
-        }
-        else
-        {
-          estadoActual = BUTTON_DOWN;
-        }
-      }
-      break;
-
-    default:
-      debounceFSM_init();
-      break;
-  }
-}
 
 
 
