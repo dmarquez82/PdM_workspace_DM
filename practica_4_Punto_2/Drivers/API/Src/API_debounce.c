@@ -1,7 +1,7 @@
 #include "API_debounce.h"
 #include "main.h"   /* para HAL_GPIO_ReadPin, LD2_GPIO_Port, B1_GPIO_Port, etc. */
 
-#define DEBOUNCE_TIME_MS  40U
+#define DEBOUNCE_TIME_MS  40
 
 /* --- Declaraciones privadas --- */
 
