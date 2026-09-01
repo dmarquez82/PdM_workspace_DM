@@ -141,6 +141,11 @@ int main(void)
 	      }
 	   }
 
+	  if (delayRead(&delayLed))
+	  {
+	      HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	  }
+
   }
   /* USER CODE END 3 */
 }
