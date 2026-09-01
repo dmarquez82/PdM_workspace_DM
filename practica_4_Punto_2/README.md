@@ -1,4 +1,4 @@
-# Práctica 4 - Punto 1: MEF Antirrebote (main.c)
+# Práctica 4 - Punto 2: Modularización del antirrebote (API_debounce)
 
 **Materia:** Programación de Microcontroladores
 **Estudiante:** Prof. Ing. Daniel Márquez
@@ -6,35 +6,48 @@
 
 ## Objetivo
 
-Implementar una Máquina de Estados Finitos (MEF) tipo Mealy para realizar antirrebote
-por software sobre el pulsador B1 de la placa, generando eventos ante flancos
-descendentes y ascendentes confirmados, sin bloquear el programa principal.
+Encapsular la MEF de antirrebote desarrollada en el Punto 1 en un módulo propio
+(`API_debounce.c` / `API_debounce.h`), y utilizarlo junto con `API_delay` para
+implementar una aplicación que cambia la frecuencia de parpadeo del LED entre 100 ms
+y 500 ms cada vez que se presiona el pulsador B1.
 
-## Diagrama de estados
+## Estructura del proyecto
 
 ```
-BUTTON_UP ──(pulsador presionado)──> BUTTON_FALLING
-BUTTON_FALLING ──(40ms, sigue presionado)──> BUTTON_DOWN  [evento: buttonPressed()]
-BUTTON_FALLING ──(40ms, ya no está presionado)──> BUTTON_UP
-BUTTON_DOWN ──(pulsador liberado)──> BUTTON_RISING
-BUTTON_RISING ──(40ms, sigue liberado)──> BUTTON_UP  [evento: buttonReleased()]
-BUTTON_RISING ──(40ms, ya no está liberado)──> BUTTON_DOWN
+Practica_4_Punto_2/
+├── Core/
+│   ├── Inc/        (main.h, stm32f4xx_hal_conf.h, etc.)
+│   └── Src/        (main.c, stm32f4xx_it.c, etc.)
+├── Drivers/
+│   ├── API/
+│   │   ├── Inc/
+│   │   │   ├── API_delay.h
+│   │   │   └── API_debounce.h
+│   │   └── Src/
+│   │       ├── API_delay.c
+│   │       └── API_debounce.c
+│   ├── BSP/
+│   ├── CMSIS/
+│   └── STM32F4xx_HAL_Driver/
 ```
 
-* **BUTTON_UP:** botón liberado, en reposo.
-* **BUTTON_FALLING:** posible flanco descendente detectado; se espera el tiempo de
-antirrebote y se relee el pin para confirmar.
-* **BUTTON_DOWN:** botón confirmado como presionado.
-* **BUTTON_RISING:** posible flanco ascendente detectado; se espera el tiempo de
-antirrebote y se relee el pin para confirmar.
+*Nota:* `Drivers/API/Inc` debe estar agregada al **include path** del proyecto para
+que el compilador encuentre los headers al incluirlos desde `main.c`.
 
-El estado inicial de la MEF es `BUTTON_UP`.
-
-## Estructura del código (`main.c`)
+## `API_debounce.h` — Interfaz pública
 
 ```c
-#define DEBOUNCE_TIME_MS  40U
+void debounceFSM_init(void);
+void debounceFSM_update(void);
+bool_t readKey(void);
+```
 
+Solo se exponen estas tres funciones. El tipo `debounceState_t` y todo el estado
+interno de la MEF permanecen ocultos en `API_debounce.c`.
+
+## Encapsulamiento en `API_debounce.c`
+
+```c
 typedef enum {
   BUTTON_UP,
   BUTTON_FALLING,
@@ -42,73 +55,108 @@ typedef enum {
   BUTTON_RISING,
 } debounceState_t;
 
-debounceState_t estadoActual;
-delay_t debounceDelay;
+static debounceState_t estadoActual;
+static delay_t debounceDelay;
+static bool_t teclaPresionada;
+
+static void buttonPressed(void);
+static void buttonReleased(void);
 ```
 
-La constante `DEBOUNCE_TIME_MS` evita hardcodear el valor de 40 ms en el código.
-`estadoActual` se declara como variable global de archivo (no local a una función).
+- `debounceState_t` se declara **privada al archivo `.c`** (no está en el `.h`).
+- `estadoActual`, `debounceDelay` y `teclaPresionada` son variables **globales
+  privadas** (`static`): necesitan persistir entre llamadas sucesivas a
+  `debounceFSM_update()` (por eso son globales de archivo, no locales a una
+  función), y se marcan `static` para que ningún otro archivo del proyecto
+  (`main.c`) pueda acceder a ellas directamente.
+- `buttonPressed`/`buttonReleased` pasan a ser **funciones privadas** (`static`):
+  solo tienen sentido llamadas internamente desde `debounceFSM_update`, y ya no
+  manejan el LED directamente (a diferencia del Punto 1) — su única
+  responsabilidad ahora es actualizar el estado interno que `readKey()` reporta.
 
-## Funciones implementadas
+## Detalle de funciones
 
 ### `void debounceFSM_init(void)`
-
-Inicializa la MEF en su estado inicial (`BUTTON_UP`) y prepara el retardo no
-bloqueante interno (`debounceDelay`) que la MEF usa para confirmar los flancos, con
-la duración `DEBOUNCE_TIME_MS`.
+Inicializa la MEF en su estado inicial (`BUTTON_UP`), resetea la bandera interna
+`teclaPresionada`, y prepara el retardo no bloqueante interno (`debounceDelay`) con
+la duración `DEBOUNCE_TIME_MS`. Al ser toda la MEF un detalle interno del módulo, es
+esta función la que debe encargarse de inicializar también sus propios recursos
+(el delay), ya que `main.c` no tiene acceso a ellos.
 
 ### `void debounceFSM_update(void)`
+Debe llamarse periódicamente. Implementa el mismo `switch-case` sobre
+`estadoActual` del Punto 1 (los 4 estados más el `default` de recuperación), leyendo
+B1 y usando el retardo no bloqueante para confirmar los flancos. Al confirmarse una
+pulsación o liberación, dispara los eventos internos `buttonPressed()` /
+`buttonReleased()`.
 
-Debe llamarse periódicamente dentro del loop principal. Implementa un `switch-case`
-sobre `estadoActual` que cubre los 4 estados definidos más un caso `default` de
-recuperación (si `estadoActual` tomara un valor inválido por algún motivo,
-se reinicializa la MEF a un estado seguro). Lee el pulsador B1, resuelve las
-transiciones de estado, y usa un retardo no bloqueante (`delayRead`) para diferir la
-segunda lectura de confirmación en los estados `BUTTON_FALLING`/`BUTTON_RISING`.
+### `bool_t readKey(void)`
+Lee la bandera interna `teclaPresionada`: si estaba en `true` (hubo una pulsación
+confirmada desde la última lectura), la resetea a `false` y devuelve `true`. Si no
+hubo pulsación pendiente, devuelve `false`. Cada pulsación se "consume" una sola vez.
 
-### `void buttonPressed(void)`
+### `static void buttonPressed(void)` *(privada)*
+Evento disparado al confirmarse el flanco descendente. Marca `teclaPresionada` en
+`true` para que `readKey()` la reporte en la próxima consulta.
 
-Evento disparado al confirmarse una pulsación real (flanco descendente confirmado).
-Enciende el LED de usuario (LD2).
+### `static void buttonReleased(void)` *(privada)*
+Evento disparado al confirmarse el flanco ascendente. Sin acción por el momento:
+`readKey()` solo reporta pulsaciones (flanco descendente), no liberaciones.
 
-### `void buttonReleased(void)`
-
-Evento disparado al confirmarse la liberación real del botón (flanco ascendente
-confirmado). Apaga el LED de usuario (LD2).
-
-## Por qué un retardo no bloqueante y no un `HAL_Delay`
-
-Un `HAL_Delay(40)` bloqueante detendría la ejecución completa del programa durante
-esos 40 ms cada vez que se detecta un posible cambio de nivel del pulsador —
-incluyendo los rebotes, que pueden ocurrir varias veces seguidas. Con la MEF y el
-retardo no bloqueante (`API_delay`), el `while(1)` sigue corriendo libremente: al
-entrar a `BUTTON_FALLING`/`BUTTON_RISING` se arma el retardo y se continúa de largo;
-en las vueltas siguientes se consulta con `delayRead` si ya se cumplió el tiempo,
-sin bloquear nada mientras tanto. Esto permite que cualquier otra tarea del sistema
-(otros delays, lecturas, etc.) siga ejecutándose.
-
-## `main()`
+## Aplicación (`main.c`) — cambio de frecuencia del LED
 
 ```c
+#include "API_debounce.h"
+#include "API_delay.h"
+
+#define LED_FREQ_FAST_MS  100U
+#define LED_FREQ_SLOW_MS  500U
+
 debounceFSM_init();
+
+delay_t delayLed;
+delayInit(&delayLed, LED_FREQ_FAST_MS);
+bool_t frecuenciaRapida = true;
 
 while (1)
 {
   debounceFSM_update();
+
+  if (readKey())
+  {
+    frecuenciaRapida = !frecuenciaRapida;
+
+    if (frecuenciaRapida)
+    {
+      delayWrite(&delayLed, LED_FREQ_FAST_MS);
+    }
+    else
+    {
+      delayWrite(&delayLed, LED_FREQ_SLOW_MS);
+    }
+  }
+
+  if (delayRead(&delayLed))
+  {
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+  }
 }
 ```
 
+`main.c` no conoce ningún detalle interno de la MEF de antirrebote (ni el enum de
+estados, ni el delay interno, ni las funciones privadas) — solo utiliza
+`debounceFSM_update()` y `readKey()` como una caja negra, quedando la lógica de
+parpadeo del LED **desacoplada** de la lógica de detección de la tecla. El módulo
+`API_delay` se usa directamente y sin relación con `API_debounce`, mostrando que
+ambas API son independientes entre sí.
+
 ## Puntos para pensar
 
-* **¿Se nota una mejora respecto a lecturas sin antirrebote?** Sí: al confirmar el
-flanco recién después de los 40 ms, se descartan los rebotes mecánicos del
-pulsador, evitando disparos múltiples de
-`buttonPressed()`/`buttonReleased()` por una sola pulsación real.
-* **¿Es adecuada la temporización de `debounceFSM_update()`?** Se llama en cada
-vuelta del `while(1)`, sin ningún delay entre llamadas — esto maximiza la
-resolución de detección de flancos. Si se llamara con un período mucho más
-grande, se correría el riesgo de no detectar pulsaciones muy cortas; con un
-período mucho más chico no habría inconveniente funcional, salvo el consumo de
-ciclos de CPU en llamadas sucesivas. Pero si se acorta mucho puede dejar de
-servir el antirebote en si.
-
+- **Control de parámetros:** `API_delay` valida puntero `NULL` y `duration == 0` en
+  sus tres funciones (ver README de la Práctica 2/3). `API_debounce` no recibe
+  parámetros de usuario en ninguna de sus funciones públicas (todas son `void` o sin
+  argumentos), por lo que no aplica validación de ese tipo en este módulo.
+- **Constantes:** `DEBOUNCE_TIME_MS`, `LED_FREQ_FAST_MS` y `LED_FREQ_SLOW_MS` se
+  definen como macros, evitando números hardcodeados en el código.
+- **Tipos estándar:** se utilizan `uint32_t`/`tick_t` (definidos vía `stdint.h` en
+  `API_delay.h`) y `bool_t` (vía `stdbool.h`) en toda la implementación.
