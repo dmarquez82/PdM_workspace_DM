@@ -1,4 +1,4 @@
-# Práctica 3: Modularización
+# Práctica 4 - Punto 1: MEF Antirrebote (main.c)
 
 **Materia:** Programación de Microcontroladores
 **Estudiante:** Prof. Ing. Daniel Márquez
@@ -6,153 +6,108 @@
 
 ## Objetivo
 
-Modularizar el código de retardos no bloqueantes desarrollado en la Práctica 2,
-encapsulándolo en una API propia (`API_delay.c` / `API_delay.h`), e implementar una
-secuencia de parpadeo con tiempos variables a partir de una tabla.
+Implementar una Máquina de Estados Finitos (MEF) tipo Mealy para realizar antirrebote
+por software sobre el pulsador B1 de la placa, generando eventos ante flancos
+descendentes y ascendentes confirmados, sin bloquear el programa principal.
 
-## Estructura del proyecto
+## Diagrama de estados
 
 ```
-Practica_3/
-├── Core/
-│   ├── Inc/        (main.h, stm32f4xx_hal_conf.h, etc.)
-│   └── Src/        (main.c, stm32f4xx_it.c, etc.)
-├── Drivers/
-│   ├── API/
-│   │   ├── Inc/
-│   │   │   └── API_delay.h
-│   │   └── Src/
-│   │       └── API_delay.c
-│   ├── BSP/
-│   ├── CMSIS/
-│   └── STM32F4xx_HAL_Driver/
+BUTTON\_UP ──(pulsador presionado)──> BUTTON\_FALLING
+BUTTON\_FALLING ──(40ms, sigue presionado)──> BUTTON\_DOWN  \[evento: buttonPressed()]
+BUTTON\_FALLING ──(40ms, ya no está presionado)──> BUTTON\_UP
+BUTTON\_DOWN ──(pulsador liberado)──> BUTTON\_RISING
+BUTTON\_RISING ──(40ms, sigue liberado)──> BUTTON\_UP  \[evento: buttonReleased()]
+BUTTON\_RISING ──(40ms, ya no está liberado)──> BUTTON\_DOWN
 ```
 
-*Nota:* la carpeta `Drivers/API/Inc` debe agregarse al **include path** del proyecto
-(clic derecho sobre la carpeta → `Add/remove include path...`) para que el compilador
-encuentre `API_delay.h` al incluirlo desde `main.c`.
+* **BUTTON\_UP:** botón liberado, en reposo.
+* **BUTTON\_FALLING:** posible flanco descendente detectado; se espera el tiempo de
+antirrebote y se relee el pin para confirmar.
+* **BUTTON\_DOWN:** botón confirmado como presionado.
+* **BUTTON\_RISING:** posible flanco ascendente detectado; se espera el tiempo de
+antirrebote y se relee el pin para confirmar.
 
-## `API_delay.h` — Estructura de datos
+El estado inicial de la MEF es `BUTTON\_UP`.
+
+## Estructura del código (`main.c`)
 
 ```c
-typedef uint32_t tick_t;
-typedef bool bool_t;
+#define DEBOUNCE\_TIME\_MS  40U
 
-typedef struct {
-    tick_t startTime;
-    tick_t duration;
-    bool_t running;
-} delay_t;
+typedef enum {
+  BUTTON\_UP,
+  BUTTON\_FALLING,
+  BUTTON\_DOWN,
+  BUTTON\_RISING,
+} debounceState\_t;
+
+debounceState\_t estadoActual;
+delay\_t debounceDelay;
 ```
 
-## Detalle de funciones
+La constante `DEBOUNCE\_TIME\_MS` evita hardcodear el valor de 40 ms en el código.
+`estadoActual` se declara como variable global de archivo (no local a una función).
 
-### `void delayInit(delay_t * delay, tick_t duration)`
-Inicializa una estructura `delay_t`: carga la duración solicitada y pone `running` en
-`false`. No inicia el conteo del tiempo — eso ocurre recién en la primera llamada a
-`delayRead`.
+## Funciones implementadas
 
-### `bool_t delayRead(delay_t * delay)`
-Función central del módulo, pensada para llamarse repetidamente dentro de un loop
-(polling), sin bloquear:
-- Si `running == false`: toma la marca de tiempo actual (`HAL_GetTick()`) como
-  `startTime`, pone `running = true`, y devuelve `false`.
-- Si `running == true`: compara `HAL_GetTick() - startTime` contra `duration`. Si se
-  cumplió, pone `running = false` y devuelve `true`; si no, devuelve `false`.
+### `void debounceFSM\_init(void)`
 
-### `void delayWrite(delay_t * delay, tick_t duration)`
-Cambia la duración de un delay ya existente, sin alterar su `running` actual. Se
-recomienda verificar con `delayIsRunning` que el delay no esté corriendo antes de
-llamarla, para evitar alterar un conteo en curso con una duración inconsistente.
+Inicializa la MEF en su estado inicial (`BUTTON\_UP`) y prepara el retardo no
+bloqueante interno (`debounceDelay`) que la MEF usa para confirmar los flancos, con
+la duración `DEBOUNCE\_TIME\_MS`.
 
-### `bool_t delayIsRunning(delay_t * delay)` *(nueva, Punto 3)*
-Devuelve una copia del campo `running`, sin modificar la estructura. Permite consultar
-desde afuera si un delay está corriendo antes de decidir reconfigurarlo con
-`delayWrite`.
+### `void debounceFSM\_update(void)`
 
-## Validación de parámetros
+Debe llamarse periódicamente dentro del loop principal. Implementa un `switch-case`
+sobre `estadoActual` que cubre los 4 estados definidos más un caso `default` de
+recuperación (si `estadoActual` tomara un valor inválido por algún motivo anómalo,
+se reinicializa la MEF a un estado seguro). Lee el pulsador B1, resuelve las
+transiciones de estado, y usa un retardo no bloqueante (`delayRead`) para diferir la
+segunda lectura de confirmación en los estados `BUTTON\_FALLING`/`BUTTON\_RISING`.
 
-Las cuatro funciones controlan los parámetros recibidos antes de operar sobre ellos:
+### `void buttonPressed(void)`
 
-- **Puntero `delay` nulo:** se verifica `delay == NULL` antes de acceder a sus campos.
-  Si es inválido, `delayInit` y `delayWrite` no hacen nada; `delayRead` y
-  `delayIsRunning` devuelven `false`.
-- **`duration == 0`:** no tiene sentido físico un retardo de 0 ms, por lo que
-  `delayInit` y `delayWrite` ignoran ese valor y no lo cargan en la estructura.
-  En `delayInit`, el flag `running` igual se deja en `false` para no dejar la
-  estructura en un estado indefinido.
+Evento disparado al confirmarse una pulsación real (flanco descendente confirmado).
+Enciende el LED de usuario (LD2).
 
-## Explicación del código (`main.c`) — Punto 2 y 3
+### `void buttonReleased(void)`
 
-Secuencia de tiempos de encendido, con duty 50%:
+Evento disparado al confirmarse la liberación real del botón (flanco ascendente
+confirmado). Apaga el LED de usuario (LD2).
+
+## Por qué un retardo no bloqueante y no un `HAL\_Delay`
+
+Un `HAL\_Delay(40)` bloqueante detendría la ejecución completa del programa durante
+esos 40 ms cada vez que se detecta un posible cambio de nivel del pulsador —
+incluyendo los rebotes, que pueden ocurrir varias veces seguidas. Con la MEF y el
+retardo no bloqueante (`API\_delay`), el `while(1)` sigue corriendo libremente: al
+entrar a `BUTTON\_FALLING`/`BUTTON\_RISING` se arma el retardo y se continúa de largo;
+en las vueltas siguientes se consulta con `delayRead` si ya se cumplió el tiempo,
+sin bloquear nada mientras tanto. Esto permite que cualquier otra tarea del sistema
+(otros delays, lecturas, etc.) siga ejecutándose en paralelo.
+
+## `main()`
 
 ```c
-const uint32_t TIEMPOS[] = {500, 100, 100, 1000};
-uint8_t n_tiempos = sizeof(TIEMPOS) / sizeof(TIEMPOS[0]);
-uint8_t idx = 0;
-uint8_t cuenta_toggle = 0;
-
-delay_t estructura_delay;
-delayInit(&estructura_delay, TIEMPOS[idx]);
+debounceFSM\_init();
 
 while (1)
 {
-  if (delayRead(&estructura_delay))
-  {
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    cuenta_toggle++;
-
-    if (cuenta_toggle >= 2)
-    {
-      cuenta_toggle = 0;
-
-      idx++;
-      if (idx == n_tiempos)
-      {
-        idx = 0;
-      }
-
-      if (!delayIsRunning(&estructura_delay))
-      {
-        delayWrite(&estructura_delay, TIEMPOS[idx]);
-      }
-    }
-  }
+  debounceFSM\_update();
 }
 ```
 
-- Se usa una **única variable `delay_t`** (`estructura_delay`) para toda la secuencia, tal como
-  pide la consigna, reconfigurando su duración con `delayWrite` en lugar de crear un
-  delay distinto por cada tiempo.
-- `TIEMPOS[]` contiene el tiempo de **encendido** de cada tramo; como se pide duty
-  50%, cada valor debe usarse dos veces seguidas (una para el ON, otra para el OFF)
-  antes de pasar al siguiente. Por eso se cuenta con `cuenta_toggle` y solo se avanza
-  `idx` cuando se completaron los 2 toggles (ON + OFF) del tramo actual.
-- Antes de reconfigurar el tiempo con `delayWrite`, se verifica con
-  `delayIsRunning(&estructura_delay)` que el delay no esté corriendo — en este punto del
-  código nunca lo está (porque `delayRead` ya puso `running = false` al devolver
-  `true`), pero se deja el chequeo como buena práctica defensiva, tal como pide el
-  Punto 3.
+## Puntos para pensar
 
-## Puntos para pensar (reflexión de la consigna)
+* **¿Se nota una mejora respecto a lecturas sin antirrebote?** Sí: al confirmar el
+flanco recién después de los 40 ms, se descartan los rebotes mecánicos del
+pulsador (que suelen durar unos pocos ms), evitando disparos múltiples de
+`buttonPressed()`/`buttonReleased()` por una sola pulsación real.
+* **¿Es adecuada la temporización de `debounceFSM\_update()`?** Se llama en cada
+vuelta del `while(1)`, sin ningún delay entre llamadas — esto maximiza la
+resolución de detección de flancos. Si se llamara con un período mucho más
+grande, se correría el riesgo de no detectar pulsaciones muy cortas; con un
+período mucho más chico no habría inconveniente funcional, salvo el consumo de
+ciclos de CPU en llamadas redundantes.
 
-- **Claridad de la consigna del Punto 2:** el enunciado indica que los tiempos son
-  "de encendido" y que el duty debe ser 50%, pero no aclara explícitamente que cada
-  tiempo deba repetirse para el ON y el OFF antes de avanzar al siguiente. Una lectura
-  apresurada podría llevar a consumir la tabla linealmente (un valor por semiciclo),
-  lo cual **no** cumple el 50% de duty para cada tramo — es el error que se detectó y
-  corrigió durante la implementación.
-- **Números mágicos:** el `2` usado para comparar `cuenta_toggle >= 2` representa "un
-  blink completo son 2 toggles" — podría nombrarse con una constante para mayor
-  claridad, aunque en este caso el comentario en el código cumple una función similar.
-  El array `TIEMPOS[]` en sí es la forma correcta de evitar hardcodear los tiempos:
-  cambiarlos o agregar un tramo nuevo solo requiere modificar esa única línea.
-- **Bibliotecas estándar:** `<stdint.h>` (para `uint32_t`/`tick_t`) y `<stdbool.h>`
-  (para `bool`/`bool_t`), incluidas en `API_delay.h`. Si la API creciera con más
-  módulos que reutilicen estos mismos typedefs, convendría moverlos a un header común
-  (por ejemplo `tipos.h`) para no obligar a otros módulos a depender de
-  `API_delay.h` únicamente para acceder a `tick_t`/`bool_t`.
-- **Control de parámetros:** las cuatro funciones de la API validan puntero `NULL` y
-  `duration == 0` (ver sección de validación arriba). No se agregó validación sobre
-  `idx` en `main.c` más allá del propio manejo cíclico del índice, dado que
-  `n_tiempos` se calcula automáticamente a partir del tamaño del array.
