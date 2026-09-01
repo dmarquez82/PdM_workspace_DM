@@ -113,14 +113,14 @@ int main(void)
 
   /* Enciendo LED2 */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-
+  debounceFSM_init();
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
+	  debounceFSM_update();
 
 
   }
