@@ -40,7 +40,8 @@ typedef enum {
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 /* Duración del antirrebote, en milisegundos */
-#define DEBOUNCE_TIME_MS  40U
+#define LED_FREQ_FAST_MS  100U
+#define LED_FREQ_SLOW_MS  500U
 
 /* USER CODE END PD */
 
@@ -81,6 +82,8 @@ void buttonReleased(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	delay_t delayLed;
+	bool_t frecuenciaRapida = true;
 
   /* USER CODE END 1 */
 
@@ -112,14 +115,31 @@ int main(void)
 
   /* Enciendo LED2 */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  debounceFSM_init();
 
+  delayInit(&delayLed, LED_FREQ_FAST_MS);
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  /*Llamado a la función MEF de debounce*/
+	  /*Llamado a la función MEF de debounce de pulsador*/
+	  debounceFSM_update();
+
+	  if (readKey())
+	  {
+	      frecuenciaRapida = !frecuenciaRapida;
+
+	      if (frecuenciaRapida)
+	      {
+	         delayWrite(&delayLed, LED_FREQ_FAST_MS);
+	      }
+	      else
+	      {
+	         delayWrite(&delayLed, LED_FREQ_SLOW_MS);
+	      }
+	   }
 
   }
   /* USER CODE END 3 */
