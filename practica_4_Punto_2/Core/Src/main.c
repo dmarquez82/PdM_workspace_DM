@@ -63,10 +63,6 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
-void debounceFSM_init(void);
-void debounceFSM_update(void);
-void buttonPressed(void);
-void buttonReleased(void);
 
 /* USER CODE END PFP */
 
