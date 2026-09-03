@@ -134,6 +134,11 @@ while (1)
   `true`), pero se deja el chequeo como buena práctica defensiva, tal como pide el
   Punto 3.
 
+## Nota sobre el uso de `static` en API_delay.c
+
+No es necesario declarar nada como `static` en `API_delay.c`: no hay
+variables ni funciones privadas, todos los tipos y funciones son públicos.
+
 ## Puntos para pensar (reflexión de la consigna)
 
 - **Claridad de la consigna del Punto 2:** el enunciado indica que los tiempos son
