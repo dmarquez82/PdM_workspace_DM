@@ -1,5 +1,5 @@
 #include "API_uart.h"
-#include "main.h"     /* para huart2, UART_HandleTypeDef */
+#include "main.h"     /* para huart2, UART_HandleTypeDef y stm32f4xx_hal.h*/
 #include <string.h>   /* para strlen buscá en las carpetas include del sistema/estándar */
 
 #define UART_MAX_SIZE      256U
@@ -59,6 +59,7 @@ void uartSendString(uint8_t * pstring)
     return;
   }
 
+  /*validación de longitud de cadena de caracteres*/
   len = (uint16_t)strlen((char *)pstring);
 
   if (len == 0U || len > UART_MAX_SIZE)
