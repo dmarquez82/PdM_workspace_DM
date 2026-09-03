@@ -8,16 +8,31 @@
 extern UART_HandleTypeDef huart2;
 
 /**
- * @brief  Inicializa la UART (ya configurada por CubeMX en huart2) e
- *         imprime por la terminal serie un mensaje con sus parámetros
- *         de configuración.
+ * @brief  Verifica que la inicialización de la UART (realizada por
+ *         MX_USART2_UART_Init(), generada por CubeMX) haya sido
+ *         exitosa, y envía por la terminal serie un mensaje con los
+ *         parámetros de configuración utilizados.
  * @param  Ninguno.
- * @retval bool_t true si la inicialización fue exitosa, false en
- *         caso contrario.
+ * @retval bool_t true si la UART está correctamente inicializada y
+ *         el mensaje se envió con éxito; false en caso contrario.
  */
 bool_t uartInit(void)
 {
   uint8_t msg[] = "UART inicializada: 115200 baudios, 8N1\r\n";
+
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    return false;
+  }
 
   if (HAL_UART_Transmit(&huart2, msg, strlen((char *)msg), UART_TIMEOUT_MS) != HAL_OK)
   {
@@ -26,6 +41,8 @@ bool_t uartInit(void)
 
   return true;
 }
+
+
 
 /**
  * @brief  Envía por UART un string completo, hasta encontrar el
@@ -52,6 +69,8 @@ void uartSendString(uint8_t * pstring)
   HAL_UART_Transmit(&huart2, pstring, len, UART_TIMEOUT_MS);
 }
 
+
+
 /**
  * @brief  Envía por UART una cantidad fija de caracteres, sin
  *         depender del terminador '\0'.
@@ -73,6 +92,8 @@ void uartSendStringSize(uint8_t * pstring, uint16_t size)
 
   HAL_UART_Transmit(&huart2, pstring, size, UART_TIMEOUT_MS);
 }
+
+
 
 /**
  * @brief  Recibe por UART una cantidad fija de caracteres, en modo
