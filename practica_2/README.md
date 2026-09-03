@@ -1,7 +1,9 @@
 # Práctica 2: Delays no bloqueantes
 
 **Materia:** Programación de Microcontroladores
+
 **Estudiante:** Prof. Ing. Daniel Márquez
+
 **Placa:** NUCLEO-F446RE
 
 ## Objetivo
