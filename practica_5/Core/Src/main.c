@@ -20,6 +20,7 @@
 #include "main.h"
 #include "API_delay.h"
 #include "API_debounce.h"
+#include "API_uart.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -79,6 +80,9 @@ void buttonReleased(void);
   * @brief  The application entry point.
   * @retval int
   */
+
+
+
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -118,6 +122,8 @@ int main(void)
   debounceFSM_init();
 
   delayInit(&delayLed, LED_FREQ_FAST_MS);
+
+  uartInit();
 
   while (1)
   {
