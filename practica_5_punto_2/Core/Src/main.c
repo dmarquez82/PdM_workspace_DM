@@ -21,6 +21,7 @@
 #include "API_delay.h"
 #include "API_debounce.h"
 #include "API_uart.h"
+#include "API_cmdparser.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -114,21 +115,29 @@ int main(void)
   delayInit(&delayLed, LED_FREQ_FAST_MS);
 
   uartInit();
+  cmdParserInit();
 
   while (1)
   {
 
-      /*Prueba de eco*/
-	  /*
-	  uint8_t c;
+     /* 2.1 Prueba de eco*/
+	 /*
+	 uint8_t c;
+     uartReceiveStringSize(&c, 1);
+	 if (c != '\0')
+	 {
+	   uartSendStringSize(&c, 1);
+	 }
+     */
 
-	  uartReceiveStringSize(&c, 1);
+	 /*2.2 Prueba recepción de línea completa con eco*/
 
-	  if (c != '\0')
-	  {
-	    uartSendStringSize(&c, 1);
-	  }
-      */
+	 cmdPoll();
+
+
+
+
+
 
 	/* USER CODE END WHILE */
 
