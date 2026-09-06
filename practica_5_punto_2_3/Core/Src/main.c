@@ -23,6 +23,7 @@
 #include "API_uart.h"
 #include "API_cmdparser.h"
 
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -116,6 +117,7 @@ int main(void)
 
   uartInit();
   cmdParserInit();
+
 
   while (1)
   {
