@@ -122,49 +122,11 @@ int main(void)
   while (1)
   {
 
-     /* 2.1 Prueba de eco*/
-	 /*
-	 uint8_t c;
-     uartReceiveStringSize(&c, 1);
-	 if (c != '\0')
-	 {
-	   uartSendStringSize(&c, 1);
-	 }
-     */
-
-	 /*2.2 Prueba recepción de línea completa con eco*/
-
-	 cmdPoll();
-
-
-
-
-
 
 	/* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  /*Llamado a la función MEF de debounce de pulsador*/
-	  debounceFSM_update();
-
-	  if (readKey())
-	  {
-	      frecuenciaRapida = !frecuenciaRapida;
-
-	      if (frecuenciaRapida)
-	      {
-	         delayWrite(&delayLed, LED_FREQ_FAST_MS);
-	      }
-	      else
-	      {
-	         delayWrite(&delayLed, LED_FREQ_SLOW_MS);
-	      }
-	   }
-
-	  if (delayRead(&delayLed))
-	  {
-	      HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-	  }
+	cmdPoll();
 
   }
   /* USER CODE END 3 */
