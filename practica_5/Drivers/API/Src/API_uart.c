@@ -8,6 +8,10 @@
 /*estructura de datos de configuración de UART2 privada*/
 static UART_HandleTypeDef API_UART2;
 
+
+
+
+
 /**
  * @brief  Verifica que la inicialización de la UART (realizada por
  *         MX_USART2_UART_Init(), generada por CubeMX) haya sido
@@ -63,12 +67,16 @@ void uartSendString(uint8_t * pstring)
   /*validación de longitud de cadena de caracteres*/
   len = (uint16_t)strlen((char *)pstring);
 
+  /*longitud entre 1 y UART_MAX_SIZE*/
   if (len == 0U || len > UART_MAX_SIZE)
   {
     return;
   }
 
-  HAL_UART_Transmit(&API_UART2, pstring, len, UART_TIMEOUT_MS);
+  if (HAL_UART_Transmit(&API_UART2, pstring, len, UART_TIMEOUT_MS) != HAL_OK)
+  {
+    /* No hay mecanismo de reporte de error disponible (función void) */
+  }
 }
 
 
@@ -87,12 +95,17 @@ void uartSendStringSize(uint8_t * pstring, uint16_t size)
     return;
   }
 
+  /*size entre 1 y UART_MAX_SIZE*/
   if (size == 0U || size > UART_MAX_SIZE)
   {
     return;
   }
 
-  HAL_UART_Transmit(&API_UART2, pstring, size, UART_TIMEOUT_MS);
+  if (HAL_UART_Transmit(&API_UART2, pstring, size, UART_TIMEOUT_MS) != HAL_OK)
+  {
+     /* No hay mecanismo de reporte de error disponible (función void) */
+  }
+
 }
 
 
@@ -116,5 +129,9 @@ void uartReceiveStringSize(uint8_t * pstring, uint16_t size)
     return;
   }
 
-  HAL_UART_Receive(&API_UART2, pstring, size, UART_TIMEOUT_MS);
+  if (HAL_UART_Receive(&API_UART2, pstring, size, UART_TIMEOUT_MS) != HAL_OK)
+  {
+	  /* Indica que no se devolvió HAL_OK*/
+	  pstring[0] = '\0';
+  }
 }
