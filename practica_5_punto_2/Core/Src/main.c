@@ -118,7 +118,8 @@ int main(void)
   while (1)
   {
 
-
+      /*Prueba de eco*/
+	  /*
 	  uint8_t c;
 
 	  uartReceiveStringSize(&c, 1);
@@ -127,7 +128,7 @@ int main(void)
 	  {
 	    uartSendStringSize(&c, 1);
 	  }
-
+      */
 
 	/* USER CODE END WHILE */
 
