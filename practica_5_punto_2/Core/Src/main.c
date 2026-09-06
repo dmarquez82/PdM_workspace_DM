@@ -119,6 +119,14 @@ int main(void)
   {
 
 
+	  uint8_t c;
+
+	  uartReceiveStringSize(&c, 1);
+
+	  if (c != '\0')
+	  {
+	    uartSendStringSize(&c, 1);
+	  }
 
 
 	/* USER CODE END WHILE */

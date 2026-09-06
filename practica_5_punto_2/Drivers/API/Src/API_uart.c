@@ -3,7 +3,7 @@
 #include <string.h>   /* para strlen buscá en las carpetas include del sistema/estándar */
 
 #define UART_MAX_SIZE      256U
-#define UART_TIMEOUT_MS     100U
+#define UART_TIMEOUT_MS     10U
 
 /*estructura de datos de configuración de UART2 privada*/
 static UART_HandleTypeDef API_UART2;
