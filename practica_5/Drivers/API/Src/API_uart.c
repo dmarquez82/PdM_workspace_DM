@@ -5,7 +5,8 @@
 #define UART_MAX_SIZE      256U
 #define UART_TIMEOUT_MS     100U
 
-extern UART_HandleTypeDef huart2;
+/*estructura de datos de configuración de UART2 privada*/
+static UART_HandleTypeDef API_UART2;
 
 /**
  * @brief  Verifica que la inicialización de la UART (realizada por
@@ -20,21 +21,21 @@ bool_t uartInit(void)
 {
   uint8_t msg[] = "UART inicializada: 115200 baudios, 8N1\r\n";
 
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  API_UART2.Instance = USART2;
+  API_UART2.Init.BaudRate = 115200;
+  API_UART2.Init.WordLength = UART_WORDLENGTH_8B;
+  API_UART2.Init.StopBits = UART_STOPBITS_1;
+  API_UART2.Init.Parity = UART_PARITY_NONE;
+  API_UART2.Init.Mode = UART_MODE_TX_RX;
+  API_UART2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  API_UART2.Init.OverSampling = UART_OVERSAMPLING_16;
 
-  if (HAL_UART_Init(&huart2) != HAL_OK)
+  if (HAL_UART_Init(&API_UART2) != HAL_OK)
   {
     return false;
   }
 
-  if (HAL_UART_Transmit(&huart2, msg, strlen((char *)msg), UART_TIMEOUT_MS) != HAL_OK)
+  if (HAL_UART_Transmit(&API_UART2, msg, strlen((char *)msg), UART_TIMEOUT_MS) != HAL_OK)
   {
     return false;
   }
@@ -67,7 +68,7 @@ void uartSendString(uint8_t * pstring)
     return;
   }
 
-  HAL_UART_Transmit(&huart2, pstring, len, UART_TIMEOUT_MS);
+  HAL_UART_Transmit(&API_UART2, pstring, len, UART_TIMEOUT_MS);
 }
 
 
@@ -91,7 +92,7 @@ void uartSendStringSize(uint8_t * pstring, uint16_t size)
     return;
   }
 
-  HAL_UART_Transmit(&huart2, pstring, size, UART_TIMEOUT_MS);
+  HAL_UART_Transmit(&API_UART2, pstring, size, UART_TIMEOUT_MS);
 }
 
 
@@ -115,5 +116,5 @@ void uartReceiveStringSize(uint8_t * pstring, uint16_t size)
     return;
   }
 
-  HAL_UART_Receive(&huart2, pstring, size, UART_TIMEOUT_MS);
+  HAL_UART_Receive(&API_UART2, pstring, size, UART_TIMEOUT_MS);
 }
