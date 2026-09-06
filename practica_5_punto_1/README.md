@@ -117,9 +117,9 @@ documentado en el código dónde se verifica el retorno y, cuando es posible
 Evitan hardcodear los valores de tamaño máximo y timeout en el cuerpo de las
 funciones.
 
-## Pendiente / a confirmar
+## Eliminación de MX_USART2_UART_Init()
 
-Queda pendiente confirmar en el `.ioc` del proyecto que no exista una doble
-inicialización del periférico USART2 (una por parte de `MX_USART2_UART_Init()`
-generado por CubeMX sobre una eventual `huart2`, y otra por parte de `uartInit()`
-sobre `API_UART2`), dado que ambos handles apuntarían al mismo periférico físico.
+Para no tener una a una doble inicialización del periférico USART2 
+(una por parte de `MX_USART2_UART_Init()` generado por CubeMX sobre una eventual `huart2`, 
+y otra por parte de `uartInit()` sobre `API_UART2`), dado que ambos handles apuntarían al 
+mismo periférico físico, se elimina la inicialización de `MX_USART2_UART_Init()` en el `main.c`.
