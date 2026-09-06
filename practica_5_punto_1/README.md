@@ -1,164 +1,125 @@
-# Práctica 4 - Punto 2: Modularización del antirrebote (API_debounce)
+# Práctica 5 - Punto 1: Módulo API_uart
 
 **Materia:** Programación de Microcontroladores
-
 **Estudiante:** Prof. Ing. Daniel Márquez
-
 **Placa:** NUCLEO-F446RE
 
 ## Objetivo
 
-Encapsular la MEF de antirrebote desarrollada en el Punto 1 en un módulo propio
-(`API_debounce.c` / `API_debounce.h`), y utilizarlo junto con `API_delay` para
-implementar una aplicación que cambia la frecuencia de parpadeo del LED entre 100 ms
-y 500 ms cada vez que se presiona el pulsador B1.
+Implementar un módulo de software para el acceso a la UART (USART2, conectada al
+puerto virtual COM del ST-Link) en modo polling, con funciones para inicializar el
+periférico, enviar y recibir strings.
 
 ## Estructura del proyecto
 
 ```
-Practica_4_Punto_2/
+Practica_5/
 ├── Core/
-│   ├── Inc/        (main.h, stm32f4xx_hal_conf.h, etc.)
-│   └── Src/        (main.c, stm32f4xx_it.c, etc.)
 ├── Drivers/
 │   ├── API/
 │   │   ├── Inc/
 │   │   │   ├── API_delay.h
-│   │   │   └── API_debounce.h
+│   │   │   ├── API_debounce.h
+│   │   │   └── API_uart.h
 │   │   └── Src/
 │   │       ├── API_delay.c
-│   │       └── API_debounce.c
+│   │       ├── API_debounce.c
+│   │       └── API_uart.c
 │   ├── BSP/
 │   ├── CMSIS/
 │   └── STM32F4xx_HAL_Driver/
 ```
 
-*Nota:* `Drivers/API/Inc` debe estar agregada al **include path** del proyecto para
-que el compilador encuentre los headers al incluirlos desde `main.c`.
+Proyecto armado como copia de la Práctica 4 - Punto 2 (ya contaba con la estructura
+`Drivers/API/Inc`/`Src` y el include path configurado).
 
-## `API_debounce.h` — Interfaz pública
-
-```c
-void debounceFSM_init(void);
-void debounceFSM_update(void);
-bool_t readKey(void);
-```
-
-Solo se exponen estas tres funciones. El tipo `debounceState_t` y todo el estado
-interno de la MEF permanecen ocultos en `API_debounce.c`.
-
-## Encapsulamiento en `API_debounce.c`
+## `API_uart.h` — Interfaz pública
 
 ```c
-typedef enum {
-  BUTTON_UP,
-  BUTTON_FALLING,
-  BUTTON_DOWN,
-  BUTTON_RISING,
-} debounceState_t;
-
-static debounceState_t estadoActual;
-static delay_t debounceDelay;
-static bool_t teclaPresionada;
-
-static void buttonPressed(void);
-static void buttonReleased(void);
+bool_t uartInit(void);
+void uartSendString(uint8_t * pstring);
+void uartSendStringSize(uint8_t * pstring, uint16_t size);
+void uartReceiveStringSize(uint8_t * pstring, uint16_t size);
 ```
 
-- `debounceState_t` se declara **privada al archivo `.c`** (no está en el `.h`).
-- `estadoActual`, `debounceDelay` y `teclaPresionada` son variables **globales
-  privadas** (`static`): necesitan persistir entre llamadas sucesivas a
-  `debounceFSM_update()` (por eso son globales de archivo, no locales a una
-  función), y se marcan `static` para que ningún otro archivo del proyecto
-  (`main.c`) pueda acceder a ellas directamente.
-- `buttonPressed`/`buttonReleased` pasan a ser **funciones privadas** (`static`):
-  solo tienen sentido llamadas internamente desde `debounceFSM_update`, y ya no
-  manejan el LED directamente (a diferencia del Punto 1) — su única
-  responsabilidad ahora es actualizar el estado interno que `readKey()` reporta.
+`bool_t` se reutiliza desde `API_delay.h` (incluido en `API_uart.h`), evitando
+redefinir el typedef en cada módulo nuevo.
+
+## Encapsulamiento en `API_uart.c`
+
+```c
+static UART_HandleTypeDef API_UART2;
+```
+
+El handle de la UART se declara como variable **privada** (`static`) del módulo,
+en vez de depender de la `huart2` generada por CubeMX. De esta forma, ningún otro
+archivo del proyecto (incluyendo `main.c`) necesita conocer ni manipular
+directamente el handle de UART — toda la interacción se hace exclusivamente a
+través de las 4 funciones públicas del módulo.
+
+*Nota: al declarar un handle propio, es responsabilidad de `uartInit()` cargar
+todos los parámetros de configuración (`Instance`, `BaudRate`, `WordLength`, etc.)
+y llamar a `HAL_UART_Init()`, en lugar de depender de que
+`MX_USART2_UART_Init()` (generado por CubeMX) lo haga automáticamente.*
 
 ## Detalle de funciones
 
-### `void debounceFSM_init(void)`
-Inicializa la MEF en su estado inicial (`BUTTON_UP`), resetea la bandera interna
-`teclaPresionada`, y prepara el retardo no bloqueante interno (`debounceDelay`) con
-la duración `DEBOUNCE_TIME_MS`. Al ser toda la MEF un detalle interno del módulo, es
-esta función la que debe encargarse de inicializar también sus propios recursos
-(el delay), ya que `main.c` no tiene acceso a ellos.
+### `bool_t uartInit(void)`
+Configura los parámetros de `API_UART2` (115200 baudios, 8N1) y llama a
+`HAL_UART_Init()`. Si la inicialización es exitosa, envía por la terminal serie un
+mensaje informando la configuración utilizada. Devuelve `true` si tanto la
+inicialización como el envío del mensaje fueron exitosos; `false` en caso
+contrario.
 
-### `void debounceFSM_update(void)`
-Debe llamarse periódicamente. Implementa el mismo `switch-case` sobre
-`estadoActual` del Punto 1 (los 4 estados más el `default` de recuperación), leyendo
-B1 y usando el retardo no bloqueante para confirmar los flancos. Al confirmarse una
-pulsación o liberación, dispara los eventos internos `buttonPressed()` /
-`buttonReleased()`.
+### `void uartSendString(uint8_t * pstring)`
+Envía por UART un string completo, calculando su longitud con `strlen` (hasta el
+carácter `'\0'`). Valida que el puntero no sea `NULL` y que la longitud esté en el
+rango permitido (1 a `UART_MAX_SIZE`). Verifica el retorno de `HAL_UART_Transmit`;
+al ser una función `void`, no existe forma de reportar el error hacia quien la
+llama.
 
-### `bool_t readKey(void)`
-Lee la bandera interna `teclaPresionada`: si estaba en `true` (hubo una pulsación
-confirmada desde la última lectura), la resetea a `false` y devuelve `true`. Si no
-hubo pulsación pendiente, devuelve `false`. Cada pulsación se "consume" una sola vez.
+### `void uartSendStringSize(uint8_t * pstring, uint16_t size)`
+Envía por UART una cantidad fija de caracteres (`size`), sin depender del
+terminador `'\0'`. Misma validación de parámetros que `uartSendString`, y misma
+verificación (sin acción posible) del retorno de `HAL_UART_Transmit`.
 
-### `static void buttonPressed(void)` *(privada)*
-Evento disparado al confirmarse el flanco descendente. Marca `teclaPresionada` en
-`true` para que `readKey()` la reporte en la próxima consulta.
+### `void uartReceiveStringSize(uint8_t * pstring, uint16_t size)`
+Recibe por UART una cantidad fija de caracteres, en modo polling (bloqueante hasta
+completar o hasta cumplirse el timeout). Valida los mismos parámetros. Si
+`HAL_UART_Receive` no devuelve `HAL_OK`, fuerza `pstring[0] = '\0'` para dejar el
+buffer en un estado conocido, en lugar de dejarlo con contenido parcial o
+indefinido.
 
-### `static void buttonReleased(void)` *(privada)*
-Evento disparado al confirmarse el flanco ascendente. Sin acción por el momento:
-`readKey()` solo reporta pulsaciones (flanco descendente), no liberaciones.
+## Validación de parámetros
 
-## Aplicación (`main.c`) — cambio de frecuencia del LED
+Las tres funciones de envío/recepción verifican:
+- **Puntero `pstring` nulo:** si es `NULL`, la función retorna sin hacer nada.
+- **`size`/longitud fuera de rango:** debe estar entre 1 y `UART_MAX_SIZE` (256,
+  valor ajustable definido como macro). Fuera de ese rango, la función retorna sin
+  hacer nada.
+
+## Verificación de retorno de funciones HAL
+
+Todas las llamadas a `HAL_UART_Transmit`/`HAL_UART_Receive` verifican su valor de
+retorno contra `HAL_OK`. Como `uartSendString`/`uartSendStringSize`/
+`uartReceiveStringSize` son funciones `void` (por especificación de la consigna),
+no existe mecanismo para propagar el error hacia quien las llama; se deja
+documentado en el código dónde se verifica el retorno y, cuando es posible
+(`uartReceiveStringSize`), se toma una acción concreta ante el fallo.
+
+## Constantes utilizadas
 
 ```c
-#include "API_debounce.h"
-#include "API_delay.h"
-
-#define LED_FREQ_FAST_MS  100U
-#define LED_FREQ_SLOW_MS  500U
-
-debounceFSM_init();
-
-delay_t delayLed;
-delayInit(&delayLed, LED_FREQ_FAST_MS);
-bool_t frecuenciaRapida = true;
-
-while (1)
-{
-  debounceFSM_update();
-
-  if (readKey())
-  {
-    frecuenciaRapida = !frecuenciaRapida;
-
-    if (frecuenciaRapida)
-    {
-      delayWrite(&delayLed, LED_FREQ_FAST_MS);
-    }
-    else
-    {
-      delayWrite(&delayLed, LED_FREQ_SLOW_MS);
-    }
-  }
-
-  if (delayRead(&delayLed))
-  {
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-  }
-}
+#define UART_MAX_SIZE      256U
+#define UART_TIMEOUT_MS     100U
 ```
 
-`main.c` no conoce ningún detalle interno de la MEF de antirrebote (ni el enum de
-estados, ni el delay interno, ni las funciones privadas) — solo utiliza
-`debounceFSM_update()` y `readKey()` como una caja negra, quedando la lógica de
-parpadeo del LED **desacoplada** de la lógica de detección de la tecla. El módulo
-`API_delay` se usa directamente y sin relación con `API_debounce`, mostrando que
-ambas API son independientes entre sí.
+Evitan hardcodear los valores de tamaño máximo y timeout en el cuerpo de las
+funciones.
 
-## Puntos para pensar
+## Pendiente / a confirmar
 
-- **Control de parámetros:** `API_delay` valida puntero `NULL` y `duration == 0` en
-  sus tres funciones (ver README de la Práctica 2/3). `API_debounce` no recibe
-  parámetros de usuario en ninguna de sus funciones públicas (todas son `void` o sin
-  argumentos), por lo que no aplica validación de ese tipo en este módulo.
-- **Constantes:** `DEBOUNCE_TIME_MS`, `LED_FREQ_FAST_MS` y `LED_FREQ_SLOW_MS` se
-  definen como macros, evitando números hardcodeados en el código.
-- **Tipos estándar:** se utilizan `uint32_t`/`tick_t` (definidos vía `stdint.h` en
-  `API_delay.h`) y `bool_t` (vía `stdbool.h`) en toda la implementación.
+Queda pendiente confirmar en el `.ioc` del proyecto que no exista una doble
+inicialización del periférico USART2 (una por parte de `MX_USART2_UART_Init()`
+generado por CubeMX sobre una eventual `huart2`, y otra por parte de `uartInit()`
+sobre `API_UART2`), dado que ambos handles apuntarían al mismo periférico físico.
