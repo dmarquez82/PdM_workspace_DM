@@ -29,12 +29,6 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef enum {
-  BUTTON_UP,
-  BUTTON_FALLING,
-  BUTTON_DOWN,
-  BUTTON_RISING,
-} debounceState_t;
 
 /* USER CODE END PTD */
 
@@ -52,7 +46,7 @@ typedef enum {
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-UART_HandleTypeDef huart2;
+
 
 /* USER CODE BEGIN PV */
 
@@ -64,10 +58,7 @@ static void MX_GPIO_Init(void);
 
 /* USER CODE BEGIN PFP */
 
-void debounceFSM_init(void);
-void debounceFSM_update(void);
-void buttonPressed(void);
-void buttonReleased(void);
+
 
 /* USER CODE END PFP */
 
@@ -126,7 +117,11 @@ int main(void)
 
   while (1)
   {
-    /* USER CODE END WHILE */
+
+
+
+
+	/* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 	  /*Llamado a la función MEF de debounce de pulsador*/
