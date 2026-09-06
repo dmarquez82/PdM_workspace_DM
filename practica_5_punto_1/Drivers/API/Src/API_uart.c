@@ -23,7 +23,7 @@ static UART_HandleTypeDef API_UART2;
  */
 bool_t uartInit(void)
 {
-  uint8_t msg[] = "UART inicializada: 115200 baudios, 8N1\r\n";
+  uint8_t msg[] = "UART inicializada: 115200 bps - 8N1\r\n";
 
   API_UART2.Instance = USART2;
   API_UART2.Init.BaudRate = 115200;
