@@ -1,164 +1,88 @@
-# Práctica 4 - Punto 2: Modularización del antirrebote (API_debounce)
+# Práctica 5 - Punto 2.2: Recepción de línea completa
 
 **Materia:** Programación de Microcontroladores
-
 **Estudiante:** Prof. Ing. Daniel Márquez
-
 **Placa:** NUCLEO-F446RE
 
 ## Objetivo
 
-Encapsular la MEF de antirrebote desarrollada en el Punto 1 en un módulo propio
-(`API_debounce.c` / `API_debounce.h`), y utilizarlo junto con `API_delay` para
-implementar una aplicación que cambia la frecuencia de parpadeo del LED entre 100 ms
-y 500 ms cada vez que se presiona el pulsador B1.
+Sobre la base del módulo `API_uart` (Punto 1), acumular los caracteres recibidos
+por UART en un buffer hasta detectar un terminador de línea (`\r`, `\n` o `\r\n`),
+ignorando líneas que comiencen con `#` o `//` (comentarios), y delegar el
+procesamiento de la línea completa a una función privada `cmdProcessLine()`.
 
-## Estructura del proyecto
+## Archivos
 
 ```
-Practica_4_Punto_2/
-├── Core/
-│   ├── Inc/        (main.h, stm32f4xx_hal_conf.h, etc.)
-│   └── Src/        (main.c, stm32f4xx_it.c, etc.)
-├── Drivers/
-│   ├── API/
-│   │   ├── Inc/
-│   │   │   ├── API_delay.h
-│   │   │   └── API_debounce.h
-│   │   └── Src/
-│   │       ├── API_delay.c
-│   │       └── API_debounce.c
-│   ├── BSP/
-│   ├── CMSIS/
-│   └── STM32F4xx_HAL_Driver/
+Drivers/API/Inc/API_cmdparser.h
+Drivers/API/Src/API_cmdparser.c
 ```
 
-*Nota:* `Drivers/API/Inc` debe estar agregada al **include path** del proyecto para
-que el compilador encuentre los headers al incluirlos desde `main.c`.
-
-## `API_debounce.h` — Interfaz pública
+## `API_cmdparser.h` — definiciones
 
 ```c
-void debounceFSM_init(void);
-void debounceFSM_update(void);
-bool_t readKey(void);
-```
+#define CMD_MAX_LINE     64U   /* incluye '\0' */
+#define CMD_MAX_TOKENS   3U    /* COMANDO + máximo 2 argumentos */
 
-Solo se exponen estas tres funciones. El tipo `debounceState_t` y todo el estado
-interno de la MEF permanecen ocultos en `API_debounce.c`.
-
-## Encapsulamiento en `API_debounce.c`
-
-```c
 typedef enum {
-  BUTTON_UP,
-  BUTTON_FALLING,
-  BUTTON_DOWN,
-  BUTTON_RISING,
-} debounceState_t;
+    CMD_OK = 0,
+    CMD_ERR_OVERFLOW,
+    CMD_ERR_SYNTAX,
+    CMD_ERR_UNKNOWN,
+    CMD_ERR_ARG
+} cmd_status_t;
 
-static debounceState_t estadoActual;
-static delay_t debounceDelay;
-static bool_t teclaPresionada;
-
-static void buttonPressed(void);
-static void buttonReleased(void);
+void cmdParserInit(void);
+void cmdPoll(void);
+void cmdPrintHelp(void);
 ```
 
-- `debounceState_t` se declara **privada al archivo `.c`** (no está en el `.h`).
-- `estadoActual`, `debounceDelay` y `teclaPresionada` son variables **globales
-  privadas** (`static`): necesitan persistir entre llamadas sucesivas a
-  `debounceFSM_update()` (por eso son globales de archivo, no locales a una
-  función), y se marcan `static` para que ningún otro archivo del proyecto
-  (`main.c`) pueda acceder a ellas directamente.
-- `buttonPressed`/`buttonReleased` pasan a ser **funciones privadas** (`static`):
-  solo tienen sentido llamadas internamente desde `debounceFSM_update`, y ya no
-  manejan el LED directamente (a diferencia del Punto 1) — su única
-  responsabilidad ahora es actualizar el estado interno que `readKey()` reporta.
+`CMD_MAX_LINE` incluye el carácter `'\0'` que marca el final de la línea, por lo
+que la cantidad máxima de caracteres útiles de texto es `CMD_MAX_LINE - 1`.
 
-## Detalle de funciones
-
-### `void debounceFSM_init(void)`
-Inicializa la MEF en su estado inicial (`BUTTON_UP`), resetea la bandera interna
-`teclaPresionada`, y prepara el retardo no bloqueante interno (`debounceDelay`) con
-la duración `DEBOUNCE_TIME_MS`. Al ser toda la MEF un detalle interno del módulo, es
-esta función la que debe encargarse de inicializar también sus propios recursos
-(el delay), ya que `main.c` no tiene acceso a ellos.
-
-### `void debounceFSM_update(void)`
-Debe llamarse periódicamente. Implementa el mismo `switch-case` sobre
-`estadoActual` del Punto 1 (los 4 estados más el `default` de recuperación), leyendo
-B1 y usando el retardo no bloqueante para confirmar los flancos. Al confirmarse una
-pulsación o liberación, dispara los eventos internos `buttonPressed()` /
-`buttonReleased()`.
-
-### `bool_t readKey(void)`
-Lee la bandera interna `teclaPresionada`: si estaba en `true` (hubo una pulsación
-confirmada desde la última lectura), la resetea a `false` y devuelve `true`. Si no
-hubo pulsación pendiente, devuelve `false`. Cada pulsación se "consume" una sola vez.
-
-### `static void buttonPressed(void)` *(privada)*
-Evento disparado al confirmarse el flanco descendente. Marca `teclaPresionada` en
-`true` para que `readKey()` la reporte en la próxima consulta.
-
-### `static void buttonReleased(void)` *(privada)*
-Evento disparado al confirmarse el flanco ascendente. Sin acción por el momento:
-`readKey()` solo reporta pulsaciones (flanco descendente), no liberaciones.
-
-## Aplicación (`main.c`) — cambio de frecuencia del LED
+## Variables privadas en `API_cmdparser.c`
 
 ```c
-#include "API_debounce.h"
-#include "API_delay.h"
-
-#define LED_FREQ_FAST_MS  100U
-#define LED_FREQ_SLOW_MS  500U
-
-debounceFSM_init();
-
-delay_t delayLed;
-delayInit(&delayLed, LED_FREQ_FAST_MS);
-bool_t frecuenciaRapida = true;
-
-while (1)
-{
-  debounceFSM_update();
-
-  if (readKey())
-  {
-    frecuenciaRapida = !frecuenciaRapida;
-
-    if (frecuenciaRapida)
-    {
-      delayWrite(&delayLed, LED_FREQ_FAST_MS);
-    }
-    else
-    {
-      delayWrite(&delayLed, LED_FREQ_SLOW_MS);
-    }
-  }
-
-  if (delayRead(&delayLed))
-  {
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-  }
-}
+static bool_t recibiendo;
+static uint8_t buffer[CMD_MAX_LINE];
+static uint16_t bufferIndex;
 ```
 
-`main.c` no conoce ningún detalle interno de la MEF de antirrebote (ni el enum de
-estados, ni el delay interno, ni las funciones privadas) — solo utiliza
-`debounceFSM_update()` y `readKey()` como una caja negra, quedando la lógica de
-parpadeo del LED **desacoplada** de la lógica de detección de la tecla. El módulo
-`API_delay` se usa directamente y sin relación con `API_debounce`, mostrando que
-ambas API son independientes entre sí.
+- `recibiendo`: indica si se está en medio de la acumulación de una línea.
+- `buffer`: acumula los caracteres recibidos.
+- `bufferIndex`: posición actual de escritura dentro de `buffer`.
 
-## Puntos para pensar
+## Funciones
 
-- **Control de parámetros:** `API_delay` valida puntero `NULL` y `duration == 0` en
-  sus tres funciones (ver README de la Práctica 2/3). `API_debounce` no recibe
-  parámetros de usuario en ninguna de sus funciones públicas (todas son `void` o sin
-  argumentos), por lo que no aplica validación de ese tipo en este módulo.
-- **Constantes:** `DEBOUNCE_TIME_MS`, `LED_FREQ_FAST_MS` y `LED_FREQ_SLOW_MS` se
-  definen como macros, evitando números hardcodeados en el código.
-- **Tipos estándar:** se utilizan `uint32_t`/`tick_t` (definidos vía `stdint.h` en
-  `API_delay.h`) y `bool_t` (vía `stdbool.h`) en toda la implementación.
+### `void cmdParserInit(void)`
+Resetea el estado de recepción (`recibiendo = false`) y el índice del buffer.
+
+### `void cmdPoll(void)`
+Lee un byte por invocación mediante `uartReceiveStringSize(&c, 1)`. Si no llegó
+ningún byte nuevo (se identifica porque `uartReceiveStringSize` deja el buffer en
+`'\0'` ante timeout de la HAL), no hace nada en esa vuelta. Si el byte recibido es
+un terminador (`\r` o `\n`) y se estaba recibiendo una línea, agrega el `'\0'`
+final al buffer y llama a `cmdProcessLine()`. Si se llena el buffer antes de
+encontrar el terminador, informa el error correspondiente y reinicia la
+recepción.
+
+### `static void cmdProcessLine(void)` *(privada)*
+Si la línea comienza con `#` o `//`, se ignora (no se procesa). En esta etapa
+(2.2), realiza un eco de la línea completa por UART, únicamente para validar que
+el mecanismo de acumulación funciona correctamente. La interpretación real de
+comandos se implementa en la etapa 2.3.
+
+## Por qué se agrega `'\0'` al completar la línea
+
+El buffer es un arreglo de tamaño fijo que puede contener contenido de usos
+anteriores más allá de la línea actual. Al colocar `'\0'` justo después del
+último carácter recibido, el buffer se convierte en un string válido según la
+convención de C, permitiendo que funciones como `uartSendString` (que usa
+`strlen` internamente) sepan exactamente dónde termina el contenido útil.
+
+## Pruebas realizadas
+
+- Línea normal (ej. `hola` + Enter): se refleja completa por UART.
+- Línea que comienza con `#` o `//`: no genera ninguna respuesta.
+- Línea de más de `CMD_MAX_LINE - 1` caracteres sin terminador: se informa el
+  error de overflow y se reinicia la recepción.
