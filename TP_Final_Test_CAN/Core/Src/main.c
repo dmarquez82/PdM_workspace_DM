@@ -18,9 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "API_can.h"
 #include "can.h"
-#include "API_uart.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -36,6 +34,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+/* Duración del antirrebote, en milisegundos */
+#define LED_FREQ_FAST_MS  100U
+#define LED_FREQ_SLOW_MS  500U
 
 /* USER CODE END PD */
 
@@ -100,12 +101,36 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_CAN1_Init();
-
   /* USER CODE BEGIN 2 */
-  can_Init();
+  CAN_FilterTypeDef configFiltro;
 
- tickAnterior = HAL_GetTick();
+  configFiltro.FilterBank = 0;
+  configFiltro.FilterMode = CAN_FILTERMODE_IDMASK;
+  configFiltro.FilterScale = CAN_FILTERSCALE_32BIT;
+  configFiltro.FilterIdHigh = 0x0000;
+  configFiltro.FilterIdLow = 0x0000;
+  configFiltro.FilterMaskIdHigh = 0x0000;
+  configFiltro.FilterMaskIdLow = 0x0000;
+  configFiltro.FilterFIFOAssignment = CAN_RX_FIFO0;
+  configFiltro.FilterActivation = ENABLE;
+  configFiltro.SlaveStartFilterBank = 14;
 
+  if (HAL_CAN_ConfigFilter(&hcan1, &configFiltro) != HAL_OK)
+  {
+      Error_Handler();
+  }
+
+  if (HAL_CAN_Start(&hcan1) != HAL_OK)
+  {
+      Error_Handler();
+  }
+
+  if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+  {
+      Error_Handler();
+  }
+
+  tickAnterior = HAL_GetTick();
 
 
   /* USER CODE END 2 */
@@ -113,8 +138,13 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
+  /* Enciendo LED2 */
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  debounceFSM_init();
+
 
   uartInit();
+  cmdParserInit();
 
 
   while (1)
@@ -124,19 +154,23 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-
 	if (HAL_GetTick() - tickAnterior >= 500)
 	{
 	    tickAnterior = HAL_GetTick();
 
-	    can_msg_t mensajeTx;
-	    mensajeTx.id = 0x100;
-	    mensajeTx.longitud = 1;
-	    mensajeTx.dato[0]++;
+	    txHeader.StdId = 0x100;
+	    txHeader.IDE = CAN_ID_STD;
+	    txHeader.RTR = CAN_RTR_DATA;
+	    txHeader.DLC = 1;
 
-	    can_write_msg(&mensajeTx);
-	  }
+	    txDatos[0]++;
+
+	    if (HAL_CAN_AddTxMessage(&hcan1, &txHeader, txDatos, &txMailbox) != HAL_OK)
+	    {
+	          Error_Handler();
+	    }
+	}
+	//cmdPoll();
 
   }
   /* USER CODE END 3 */
@@ -191,9 +225,12 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-void can_read_msg_callback(can_msg_t *mensaje)
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxDatos) == HAL_OK)
+    {
+        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    }
 }
 
 /* USER CODE END 4 */
