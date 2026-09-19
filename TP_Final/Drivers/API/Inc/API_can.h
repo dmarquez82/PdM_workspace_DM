@@ -1,5 +1,5 @@
-#ifndef CAN_H
-#define CAN_H
+#ifndef API_CAN_H
+#define API_CAN_H
 
 #include <stdint.h>
 
@@ -19,9 +19,10 @@ typedef struct
 /**
  * @brief  Inicializa el driver CAN.
  * @param  Ninguno.
- * @retval Ninguno.
+ * @retval uint8_t: 1 si toda la inicialización de hardware fue
+ *         exitosa, 0 si alguna etapa falló.
  */
-void can_Init(void);
+uint8_t can_Init(void);
 
 /**
  * @brief  Envía un mensaje por el bus CAN.

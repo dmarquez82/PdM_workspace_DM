@@ -23,6 +23,7 @@
 #include "API_uart.h"
 #include "usart.h"
 #include "gpio.h"
+#include "mef_tablero.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -102,10 +103,11 @@ int main(void)
   MX_CAN1_Init();
 
   /* USER CODE BEGIN 2 */
-  can_Init();
-
- tickAnterior = HAL_GetTick();
-
+  if (can_Init() != 1)
+  {
+      Error_Handler();
+  }
+  tableroMef_init();
 
 
   /* USER CODE END 2 */
@@ -125,18 +127,8 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+	tableroMef_update();
 
-	if (HAL_GetTick() - tickAnterior >= 500)
-	{
-	    tickAnterior = HAL_GetTick();
-
-	    can_msg_t mensajeTx;
-	    mensajeTx.id = 0x100;
-	    mensajeTx.longitud = 1;
-	    mensajeTx.dato[0]++;
-
-	    can_write_msg(&mensajeTx);
-	  }
 
   }
   /* USER CODE END 3 */
@@ -191,10 +183,7 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-void can_read_msg_callback(can_msg_t *mensaje)
-{
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-}
+
 
 /* USER CODE END 4 */
 

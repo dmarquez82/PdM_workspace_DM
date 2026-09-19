@@ -1,8 +1,8 @@
 #include "API_can.h"
 
-// Declaraciones internas del driver: no forman parte de can.h,
+// Declaraciones internas del driver: no forman parte de API_can.h,
 // por lo tanto no son visibles para main.c ni para otros módulos.
-extern void can_port_Init(void);
+extern uint8_t can_port_Init(void);
 extern uint8_t can_port_write(can_msg_t *mensaje);
 
 /**
@@ -11,11 +11,12 @@ extern uint8_t can_port_write(can_msg_t *mensaje);
  *         arranque del periférico y activación de la interrupción
  *         de recepción) en la capa de port.
  * @param  Ninguno.
- * @retval Ninguno.
+ * @retval uint8_t: 1 si toda la inicialización de hardware fue
+ *         exitosa, 0 si alguna etapa falló.
  */
-void can_Init(void)
+uint8_t can_Init(void)
 {
-    can_port_Init();
+    return can_port_Init();
 }
 
 /**
@@ -46,7 +47,7 @@ __attribute__((weak)) void can_read_msg_callback(can_msg_t *mensaje)
 }
 
 /**
- * @brief  Uso interno del driver. La invoca can_port_stm32f4xx.c
+ * @brief  Uso interno del driver. La invoca API_can_port_stm32f4xx.c
  *         cuando el hardware recibe un mensaje, y esta a su vez
  *         invoca al callback de aplicación (can_read_msg_callback).
  *         Existe para que la capa de port no dependa directamente

@@ -1,15 +1,14 @@
 #include "API_debounce.h"
-#include "main.h"   /* para HAL_GPIO_ReadPin, LD2_GPIO_Port, B1_GPIO_Port, etc. */
 
-#define DEBOUNCE_TIME_MS  40
+#define DEBOUNCE_TIME_MS 40
 
 /* --- Declaraciones privadas --- */
-
-typedef enum {
-  BUTTON_UP,
-  BUTTON_FALLING,
-  BUTTON_DOWN,
-  BUTTON_RISING,
+typedef enum
+{
+    BUTTON_UP,
+    BUTTON_FALLING,
+    BUTTON_DOWN,
+    BUTTON_RISING,
 } debounceState_t;
 
 static debounceState_t estadoActual;
@@ -19,7 +18,8 @@ static bool_t teclaPresionada;
 static void buttonPressed(void);
 static void buttonReleased(void);
 
-/* --- Implementación pública --- */
+// Declaración interna del driver: la implementa API_debounce_port_stm32f4xx.c
+extern bool_t debounce_ReadButton(void);
 
 /**
  * @brief  Inicializa la MEF de antirrebote en su estado inicial
@@ -30,72 +30,73 @@ static void buttonReleased(void);
  */
 void debounceFSM_init(void)
 {
-  estadoActual = BUTTON_UP;
-  teclaPresionada = false;
-  delayInit(&debounceDelay, DEBOUNCE_TIME_MS);
+    estadoActual = BUTTON_UP;
+    teclaPresionada = false;
+    delayInit(&debounceDelay, DEBOUNCE_TIME_MS);
 }
 
 /**
- * @brief  Actualiza la MEF de antirrebote: lee el estado del
- *         pulsador B1, resuelve las transiciones de estado
- *         correspondientes, y dispara los eventos internos
- *         buttonPressed/buttonReleased cuando corresponde. Debe
- *         llamarse periódicamente dentro del loop principal.
+ * @brief  Actualiza la MEF de antirrebote: consulta si el botón
+ *         está presionado a través de debounce_port_ReadButton(),
+ *         resuelve las transiciones de estado correspondientes,
+ *         y dispara los eventos internos buttonPressed/buttonReleased
+ *         cuando corresponde. Debe llamarse periódicamente dentro
+ *         del loop principal.
  * @param  Ninguno.
  * @retval Ninguno.
  */
 void debounceFSM_update(void)
 {
-  switch (estadoActual)
-  {
-    case BUTTON_UP:
-      if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
-      {
-        estadoActual = BUTTON_FALLING;
-      }
-      break;
+    switch (estadoActual)
+    {
+        case BUTTON_UP:
+            if (debounce_ReadButton() == true)
+            {
+                estadoActual = BUTTON_FALLING;
+            }
+            break;
 
-    case BUTTON_FALLING:
-      if (delayRead(&debounceDelay))
-      {
-        if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
-        {
-          estadoActual = BUTTON_DOWN;
-          buttonPressed();
-        }
-        else
-        {
-          estadoActual = BUTTON_UP;
-        }
-      }
-      break;
+        case BUTTON_FALLING:
+            if (delayRead(&debounceDelay))
+            {
+                if (debounce_ReadButton() == true)
+                {
+                    estadoActual = BUTTON_DOWN;
+                    buttonPressed();
+                }
+                else
+                {
+                    estadoActual = BUTTON_UP;
+                }
+            }
+            break;
 
-    case BUTTON_DOWN:
-      if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET)
-      {
-        estadoActual = BUTTON_RISING;
-      }
-      break;
+        case BUTTON_DOWN:
+            if (debounce_ReadButton() == false)
+            {
+                estadoActual = BUTTON_RISING;
+            }
+            break;
 
-    case BUTTON_RISING:
-      if (delayRead(&debounceDelay))
-      {
-        if (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET)
-        {
-          estadoActual = BUTTON_UP;
-          buttonReleased();
-        }
-        else
-        {
-          estadoActual = BUTTON_DOWN;
-        }
-      }
-      break;
+        case BUTTON_RISING:
+            if (delayRead(&debounceDelay))
+            {
+                if (debounce_ReadButton() == false)
+                {
+                    estadoActual = BUTTON_UP;
+                    buttonReleased();
+                }
+                else
+                {
+                    estadoActual = BUTTON_DOWN;
+                }
+            }
+            break;
 
-    default:
-      debounceFSM_init();
-      break;
-  }
+        default:
+            debounceFSM_init();
+            break;
+    }
 }
 
 /**
@@ -108,33 +109,18 @@ void debounceFSM_update(void)
  */
 bool_t readKey(void)
 {
-  bool_t valor = teclaPresionada;
-  teclaPresionada = false;
-  return valor;
+    bool_t valor = teclaPresionada;
+    teclaPresionada = false;
+    return valor;
 }
 
 /* --- Implementación privada --- */
-
-/**
- * @brief  Evento interno disparado al confirmarse una pulsación
- *         real del botón. Marca la bandera interna que readKey()
- *         reporta y resetea.
- * @param  Ninguno.
- * @retval Ninguno.
- */
 static void buttonPressed(void)
 {
-  teclaPresionada = true;
+    teclaPresionada = true;
 }
 
-/**
- * @brief  Evento interno disparado al confirmarse la liberación
- *         real del botón. Sin acción por el momento: readKey()
- *         solo reporta el flanco descendente.
- * @param  Ninguno.
- * @retval Ninguno.
- */
 static void buttonReleased(void)
 {
-  /* Sin acción por ahora */
+    /* Sin acción por ahora */
 }

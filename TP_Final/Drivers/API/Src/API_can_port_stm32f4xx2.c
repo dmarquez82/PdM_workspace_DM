@@ -2,7 +2,7 @@
 #include "stm32f4xx_hal.h"
 
 // Declaración interna: solo la usa este archivo para notificar
-// a can.c que llegó un mensaje. No forma parte de can.h.
+// a API_can.c que llegó un mensaje. No forma parte de API_can.h.
 extern void can_NotificarRecepcion(can_msg_t *mensaje);
 
 extern CAN_HandleTypeDef hcan1;
@@ -15,9 +15,10 @@ static uint8_t rxDatos[8];
  *         filtro de recepción (acepta todos los ID), arranque del
  *         periférico y activación de la interrupción RX0.
  * @param  Ninguno.
- * @retval Ninguno.
+ * @retval uint8_t: 1 si las tres etapas devolvieron HAL_OK, 0 si
+ *         alguna falló.
  */
-void can_port_Init(void)
+uint8_t can_port_Init(void)
 {
     CAN_FilterTypeDef configFiltro;
 
@@ -32,9 +33,22 @@ void can_port_Init(void)
     configFiltro.FilterActivation = ENABLE;
     configFiltro.SlaveStartFilterBank = 14;
 
-    HAL_CAN_ConfigFilter(&hcan1, &configFiltro);
-    HAL_CAN_Start(&hcan1);
-    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+    if (HAL_CAN_ConfigFilter(&hcan1, &configFiltro) != HAL_OK)
+    {
+        return 0;
+    }
+
+    if (HAL_CAN_Start(&hcan1) != HAL_OK)
+    {
+        return 0;
+    }
+
+    if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+    {
+        return 0;
+    }
+
+    return 1;
 }
 
 /**
