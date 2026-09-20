@@ -15,10 +15,10 @@ static uint8_t rxDatos[8];
  *         filtro de recepción (acepta todos los ID), arranque del
  *         periférico y activación de la interrupción RX0.
  * @param  Ninguno.
- * @retval uint8_t: 1 si las tres etapas devolvieron HAL_OK, 0 si
- *         alguna falló.
+ * @retval bool_t: true si las tres etapas devolvieron HAL_OK, false
+ *         si alguna falló.
  */
-uint8_t can_port_Init(void)
+bool_t can_port_Init(void)
 {
     CAN_FilterTypeDef configFiltro;
 
@@ -35,29 +35,30 @@ uint8_t can_port_Init(void)
 
     if (HAL_CAN_ConfigFilter(&hcan1, &configFiltro) != HAL_OK)
     {
-        return 0;
+        return false;
     }
 
     if (HAL_CAN_Start(&hcan1) != HAL_OK)
     {
-        return 0;
+        return false;
     }
 
     if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
     {
-        return 0;
+        return false;
     }
 
-    return 1;
+    return true;
 }
 
 /**
  * @brief  Transmite un mensaje usando HAL_CAN_AddTxMessage, traduciendo
  *         la estructura genérica can_msg_t a los tipos que espera HAL.
  * @param  mensaje: puntero a la estructura can_msg_t a transmitir.
- * @retval uint8_t: 1 si HAL_CAN_AddTxMessage devolvió HAL_OK, 0 si no.
+ * @retval bool_t: true si HAL_CAN_AddTxMessage devolvió HAL_OK, false
+ *         si no.
  */
-uint8_t can_port_write(can_msg_t *mensaje)
+bool_t can_port_write(can_msg_t *mensaje)
 {
     CAN_TxHeaderTypeDef txHeader;
     uint32_t txMailbox;
@@ -69,10 +70,10 @@ uint8_t can_port_write(can_msg_t *mensaje)
 
     if (HAL_CAN_AddTxMessage(&hcan1, &txHeader, mensaje->dato, &txMailbox) != HAL_OK)
     {
-        return 0;
+        return false;
     }
 
-    return 1;
+    return true;
 }
 
 /**

@@ -2,8 +2,8 @@
 
 // Declaraciones internas del driver: no forman parte de API_can.h,
 // por lo tanto no son visibles para main.c ni para otros módulos.
-extern uint8_t can_port_Init(void);
-extern uint8_t can_port_write(can_msg_t *mensaje);
+extern bool_t can_port_Init(void);
+extern bool_t can_port_write(can_msg_t *mensaje);
 
 /**
  * @brief  Inicializa el driver CAN.
@@ -11,10 +11,10 @@ extern uint8_t can_port_write(can_msg_t *mensaje);
  *         arranque del periférico y activación de la interrupción
  *         de recepción) en la capa de port.
  * @param  Ninguno.
- * @retval uint8_t: 1 si toda la inicialización de hardware fue
- *         exitosa, 0 si alguna etapa falló.
+ * @retval bool_t: true si toda la inicialización de hardware fue
+ *         exitosa, false si alguna etapa falló.
  */
-uint8_t can_Init(void)
+bool_t can_Init(void)
 {
     return can_port_Init();
 }
@@ -23,10 +23,10 @@ uint8_t can_Init(void)
  * @brief  Envía un mensaje por el bus CAN.
  * @param  mensaje: puntero a la estructura can_msg_t con el ID,
  *         los datos y la longitud (en bytes) a transmitir.
- * @retval uint8_t: 1 si el mensaje se encoló correctamente para
- *         transmitir, 0 si ocurrió un error.
+ * @retval bool_t: true si el mensaje se encoló correctamente para
+ *         transmitir, false si ocurrió un error.
  */
-uint8_t can_write_msg(can_msg_t *mensaje)
+bool_t can_write_msg(can_msg_t *mensaje)
 {
     return can_port_write(mensaje);
 }

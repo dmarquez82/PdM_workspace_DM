@@ -51,10 +51,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t txDatos[8];
-uint8_t rxDatos[8];
-uint32_t txMailbox;
-uint32_t tickAnterior;
 
 /* USER CODE END PV */
 
@@ -104,14 +100,18 @@ int main(void)
   MX_CAN1_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  if (can_Init() != 1)
+
+  if (can_Init() != true)
   {
       Error_Handler();
   }
 
-  uartInit();
+  if (uartInit() != true)
+  {
+      Error_Handler();
+  }
 
-  if (ldr_Init() != 1)
+  if (ldr_Init() != true)
   {
       Error_Handler();
   }
@@ -128,7 +128,6 @@ int main(void)
   while (1)
   {
 
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -136,10 +135,10 @@ int main(void)
 	tableroMef_update();
 	backlightMef_update();
 
-
   }
   /* USER CODE END 3 */
 }
+
 
 /**
   * @brief System Clock Configuration
@@ -189,7 +188,6 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
 
 
 /* USER CODE END 4 */

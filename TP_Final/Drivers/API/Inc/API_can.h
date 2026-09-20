@@ -2,6 +2,7 @@
 #define API_CAN_H
 
 #include <stdint.h>
+#include "API_delay.h" /* para bool_t */
 
 /**
  * @brief Estructura genérica de un mensaje CAN, independiente del
@@ -19,22 +20,23 @@ typedef struct
 /**
  * @brief  Inicializa el driver CAN.
  * @param  Ninguno.
- * @retval uint8_t: 1 si toda la inicialización de hardware fue
- *         exitosa, 0 si alguna etapa falló.
+ * @retval bool_t: true si toda la inicialización de hardware fue
+ *         exitosa, false si alguna etapa falló.
  */
-uint8_t can_Init(void);
+bool_t can_Init(void);
 
 /**
  * @brief  Envía un mensaje por el bus CAN.
  * @param  mensaje: puntero a la estructura can_msg_t a transmitir.
- * @retval uint8_t: 1 si se encoló correctamente, 0 si hubo error.
+ * @retval bool_t: true si el mensaje se encoló correctamente para
+ *         transmitir, false si ocurrió un error.
  */
-uint8_t can_write_msg(can_msg_t *mensaje);
+bool_t can_write_msg(can_msg_t *mensaje);
 
 /**
  * @brief  Callback de recepción. Implementación __weak (vacía) en
- *         can.c: la aplicación debe redefinirla (sin __weak) para
- *         procesar los mensajes que llegan por el bus.
+ *         API_can.c: la aplicación debe redefinirla (sin __weak)
+ *         para procesar los mensajes que llegan por el bus.
  * @param  mensaje: puntero a la estructura can_msg_t recibida.
  * @retval Ninguno.
  */
