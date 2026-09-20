@@ -18,11 +18,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "API_can.h"
+#include "adc.h"
 #include "can.h"
-#include "API_uart.h"
 #include "usart.h"
 #include "gpio.h"
+#include "API_can.h"
+#include "API_uart.h"
+#include "API_ldr.h"
 #include "mef_tablero.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -99,7 +101,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_CAN1_Init();
-
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   if (can_Init() != 1)
   {
@@ -107,6 +109,12 @@ int main(void)
   }
 
   uartInit();
+
+  if (ldr_Init() != 1)
+  {
+      Error_Handler();
+  }
+
   tableroMef_init();
 
   /* USER CODE END 2 */
