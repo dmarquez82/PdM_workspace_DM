@@ -48,8 +48,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-CAN_TxHeaderTypeDef txHeader;
-CAN_RxHeaderTypeDef rxHeader;
 uint8_t txDatos[8];
 uint8_t rxDatos[8];
 uint32_t txMailbox;
@@ -107,16 +105,14 @@ int main(void)
   {
       Error_Handler();
   }
-  tableroMef_init();
 
+  uartInit();
+  tableroMef_init();
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-
-  uartInit();
 
 
   while (1)

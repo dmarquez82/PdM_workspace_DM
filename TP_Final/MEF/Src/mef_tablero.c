@@ -2,6 +2,8 @@
 #include "API_can.h"
 #include "API_debounce.h"
 #include "API_delay.h"
+#include "API_uart.h"
+#include <stdio.h>
 
 #define CAN_ID_COMANDO   0x100
 #define CAN_ID_ACK       0x200
@@ -25,7 +27,17 @@ static delay_t delayTimeoutAck;
 static volatile bool_t ackRecibido;
 static volatile uint8_t datoAckRecibido;
 
+/* Copia del último mensaje recibido, para loguearlo fuera de la
+   interrupción. La interrupción solo copia datos y levanta una
+   bandera; nunca transmite por UART directamente. */
+static volatile bool_t rxLogPendiente;
+static volatile uint32_t rxLogId;
+static volatile uint8_t rxLogDato[8];
+static volatile uint8_t rxLogLongitud;
+
 static void enviarComando(uint8_t dato);
+static void loguearMensaje(const char *prefijo, uint32_t id, uint8_t *dato, uint8_t longitud);
+static void loguearTimeout(const char *accion);
 
 // Declaraciones internas: las implementa mef_tablero_port_stm32f4xx.c
 extern void tableroPort_EncenderLed(void);
@@ -41,6 +53,7 @@ void tableroMef_init(void)
 {
     estadoActual = ESTADO_REPOSO;
     ackRecibido = false;
+    rxLogPendiente = false;
     debounceFSM_init();
 }
 
@@ -52,6 +65,15 @@ void tableroMef_init(void)
 void tableroMef_update(void)
 {
     debounceFSM_update();
+
+    /* Log del último mensaje CAN recibido, si hay uno pendiente.
+       Se procesa acá (fuera de la interrupción) para no bloquear
+       la ISR con una transmisión UART. */
+    if (rxLogPendiente == true)
+    {
+        rxLogPendiente = false;
+        loguearMensaje("RX", rxLogId, (uint8_t *)rxLogDato, rxLogLongitud);
+    }
 
     switch (estadoActual)
     {
@@ -72,6 +94,7 @@ void tableroMef_update(void)
             }
             else if (delayRead(&delayTimeoutAck) == true)
             {
+                loguearTimeout("activacion");
                 estadoActual = ESTADO_REPOSO;
             }
             break;
@@ -93,6 +116,7 @@ void tableroMef_update(void)
             }
             else if (delayRead(&delayTimeoutAck) == true)
             {
+                loguearTimeout("desactivacion");
                 estadoActual = ESTADO_SALIDA_ACTIVA;
             }
             break;
@@ -105,7 +129,8 @@ void tableroMef_update(void)
 
 /**
  * @brief  Arma y transmite el mensaje de comando por CAN, y
- *         resetea la bandera de ACK antes de esperarlo.
+ *         resetea la bandera de ACK antes de esperarlo. Si el
+ *         envío fue exitoso, lo loguea por UART.
  * @param  dato: DATO_ACTIVAR o DATO_DESACTIVAR.
  * @retval Ninguno.
  */
@@ -118,23 +143,84 @@ static void enviarComando(uint8_t dato)
     mensajeTx.dato[0] = dato;
 
     ackRecibido = false;
-    can_write_msg(&mensajeTx);
+
+    if (can_write_msg(&mensajeTx) == 1)
+    {
+        loguearMensaje("TX", mensajeTx.id, mensajeTx.dato, mensajeTx.longitud);
+    }
+}
+
+/**
+ * @brief  Arma una línea de texto con el prefijo (TX/RX), el ID,
+ *         el DLC (longitud) y los datos del mensaje CAN en
+ *         formato hexadecimal, y la envía por UART.
+ * @param  prefijo: "TX" o "RX", para distinguir el sentido del mensaje.
+ * @param  id: identificador del mensaje CAN.
+ * @param  dato: puntero al arreglo de datos del mensaje.
+ * @param  longitud: cantidad de bytes válidos en 'dato' (0 a 8).
+ * @retval Ninguno.
+ */
+static void loguearMensaje(const char *prefijo, uint32_t id, uint8_t *dato, uint8_t longitud)
+{
+    char buffer[96];
+    uint16_t posicion;
+    uint8_t i;
+
+    posicion = (uint16_t)sprintf(buffer, "%s - ID: 0x%03lX - DLC: %d - Datos:", prefijo, id, longitud);
+
+    for (i = 0; i < longitud; i++)
+    {
+        posicion = posicion + (uint16_t)sprintf(&buffer[posicion], " 0x%02X", dato[i]);
+    }
+
+    buffer[posicion] = '\r';
+    buffer[posicion + 1] = '\n';
+    posicion = posicion + 2;
+
+    uartSendStringSize((uint8_t *)buffer, posicion);
+}
+
+/**
+ * @brief  Informa por UART que se venció el tiempo de espera del
+ *         ACK sin recibir respuesta.
+ * @param  accion: texto descriptivo ("activacion" o "desactivacion"),
+ *         para indicar de qué comando era la espera.
+ * @retval Ninguno.
+ */
+static void loguearTimeout(const char *accion)
+{
+    char buffer[64];
+    uint16_t posicion;
+
+    posicion = (uint16_t)sprintf(buffer, "TIMEOUT - No hubo respuesta (ACK %s)\r\n", accion);
+    uartSendStringSize((uint8_t *)buffer, posicion);
 }
 
 /**
  * @brief  Redefinición (sin __weak) del callback de recepción CAN.
- *         Se ejecuta en contexto de interrupción, por eso se limita
- *         a guardar el dato recibido y levantar una bandera —
- *         nada de lógica pesada acá (buena práctica de interrupciones
- *         cortas, vista en la materia).
+ *         Se ejecuta en contexto de interrupción: se limita a
+ *         copiar el dato recibido y levantar banderas — nada de
+ *         transmisión UART acá (interrupciones cortas).
  * @param  mensaje: puntero al mensaje CAN recibido.
  * @retval Ninguno.
  */
 void can_read_msg_callback(can_msg_t *mensaje)
 {
+    uint8_t i;
+
     if (mensaje->id == CAN_ID_ACK)
     {
         datoAckRecibido = mensaje->dato[0];
         ackRecibido = true;
     }
+
+    rxLogId = mensaje->id;
+    rxLogLongitud = mensaje->longitud;
+
+    for (i = 0; i < mensaje->longitud; i++)
+    {
+        rxLogDato[i] = mensaje->dato[i];
+    }
+
+    rxLogPendiente = true;
 }
