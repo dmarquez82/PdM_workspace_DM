@@ -26,6 +26,7 @@
 #include "API_uart.h"
 #include "API_ldr.h"
 #include "mef_tablero.h"
+#include "mef_backlight.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -116,6 +117,7 @@ int main(void)
   }
 
   tableroMef_init();
+  backlightMef_init();
 
   /* USER CODE END 2 */
 
@@ -132,6 +134,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	tableroMef_update();
+	backlightMef_update();
 
 
   }
