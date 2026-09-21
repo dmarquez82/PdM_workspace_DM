@@ -2,7 +2,6 @@
 
 #define DEBOUNCE_TIME_MS 40
 
-/* --- Declaraciones privadas --- */
 typedef enum
 {
     BUTTON_UP,
@@ -11,14 +10,13 @@ typedef enum
     BUTTON_RISING,
 } debounceState_t;
 
-static debounceState_t estadoActual;
+static debounceState_t currentState;
 static delay_t debounceDelay;
-static bool_t teclaPresionada;
+static bool_t keyPressed;
 
 static void buttonPressed(void);
 static void buttonReleased(void);
 
-// Declaración interna del driver: la implementa API_debounce_port_stm32f4xx.c
 extern bool_t debounce_ReadButton(void);
 
 /**
@@ -30,14 +28,14 @@ extern bool_t debounce_ReadButton(void);
  */
 void debounceFSM_init(void)
 {
-    estadoActual = BUTTON_UP;
-    teclaPresionada = false;
+    currentState = BUTTON_UP;
+    keyPressed = false;
     delayInit(&debounceDelay, DEBOUNCE_TIME_MS);
 }
 
 /**
  * @brief  Actualiza la MEF de antirrebote: consulta si el botón
- *         está presionado a través de debounce_port_ReadButton(),
+ *         está presionado a través de debounce_ReadButton(),
  *         resuelve las transiciones de estado correspondientes,
  *         y dispara los eventos internos buttonPressed/buttonReleased
  *         cuando corresponde. Debe llamarse periódicamente dentro
@@ -47,12 +45,12 @@ void debounceFSM_init(void)
  */
 void debounceFSM_update(void)
 {
-    switch (estadoActual)
+    switch (currentState)
     {
         case BUTTON_UP:
             if (debounce_ReadButton() == true)
             {
-                estadoActual = BUTTON_FALLING;
+                currentState = BUTTON_FALLING;
             }
             break;
 
@@ -61,12 +59,12 @@ void debounceFSM_update(void)
             {
                 if (debounce_ReadButton() == true)
                 {
-                    estadoActual = BUTTON_DOWN;
+                    currentState = BUTTON_DOWN;
                     buttonPressed();
                 }
                 else
                 {
-                    estadoActual = BUTTON_UP;
+                    currentState = BUTTON_UP;
                 }
             }
             break;
@@ -74,7 +72,7 @@ void debounceFSM_update(void)
         case BUTTON_DOWN:
             if (debounce_ReadButton() == false)
             {
-                estadoActual = BUTTON_RISING;
+                currentState = BUTTON_RISING;
             }
             break;
 
@@ -83,12 +81,12 @@ void debounceFSM_update(void)
             {
                 if (debounce_ReadButton() == false)
                 {
-                    estadoActual = BUTTON_UP;
+                    currentState = BUTTON_UP;
                     buttonReleased();
                 }
                 else
                 {
-                    estadoActual = BUTTON_DOWN;
+                    currentState = BUTTON_DOWN;
                 }
             }
             break;
@@ -109,15 +107,14 @@ void debounceFSM_update(void)
  */
 bool_t readKey(void)
 {
-    bool_t valor = teclaPresionada;
-    teclaPresionada = false;
-    return valor;
+    bool_t value = keyPressed;
+    keyPressed = false;
+    return value;
 }
 
-/* --- Implementación privada --- */
 static void buttonPressed(void)
 {
-    teclaPresionada = true;
+    keyPressed = true;
 }
 
 static void buttonReleased(void)

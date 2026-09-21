@@ -13,8 +13,8 @@
 typedef struct
 {
     uint32_t id;       /*!< Identificador del mensaje (ID estándar, 11 bits) */
-    uint8_t dato[8];    /*!< Datos del mensaje, hasta 8 bytes */
-    uint8_t longitud;   /*!< Cantidad de bytes válidos en 'dato' (0 a 8) */
+    uint8_t data[8];    /*!< Datos del mensaje, hasta 8 bytes */
+    uint8_t length;     /*!< Cantidad de bytes válidos en 'data' (0 a 8) */
 } can_msg_t;
 
 /**
@@ -27,19 +27,19 @@ bool_t can_Init(void);
 
 /**
  * @brief  Envía un mensaje por el bus CAN.
- * @param  mensaje: puntero a la estructura can_msg_t a transmitir.
+ * @param  message: puntero a la estructura can_msg_t a transmitir.
  * @retval bool_t: true si el mensaje se encoló correctamente para
  *         transmitir, false si ocurrió un error.
  */
-bool_t can_write_msg(can_msg_t *mensaje);
+bool_t can_write_msg(can_msg_t *message);
 
 /**
  * @brief  Callback de recepción. Implementación __weak (vacía) en
  *         API_can.c: la aplicación debe redefinirla (sin __weak)
  *         para procesar los mensajes que llegan por el bus.
- * @param  mensaje: puntero a la estructura can_msg_t recibida.
+ * @param  message: puntero a la estructura can_msg_t recibida.
  * @retval Ninguno.
  */
-void can_read_msg_callback(can_msg_t *mensaje);
+void can_read_msg_callback(can_msg_t *message);
 
 #endif

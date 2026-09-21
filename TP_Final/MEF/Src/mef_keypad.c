@@ -22,14 +22,9 @@ typedef enum
 static keypadState_t currentState;
 static delay_t ackTimeoutDelay;
 
-/* Variables compartidas con el callback de recepción CAN (interrupción):
-   deben ser volatile porque cambian fuera del flujo normal del programa. */
 static volatile bool_t ackReceived;
 static volatile uint8_t ackReceivedData;
 
-/* Copia del último mensaje recibido, para loguearlo fuera de la
-   interrupción. La interrupción solo copia datos y levanta una
-   bandera; nunca transmite por UART directamente. */
 static volatile bool_t rxLogPending;
 static volatile uint32_t rxLogId;
 static volatile uint8_t rxLogData[8];
@@ -39,7 +34,6 @@ static void sendCommand(uint8_t data);
 static void logMessage(const char *prefix, uint32_t id, uint8_t *data, uint8_t length);
 static void logTimeout(const char *action);
 
-// Declaraciones internas: las implementa mef_keypad_port_stm32f4xx.c
 extern void keypadPort_TurnOnLed(void);
 extern void keypadPort_TurnOffLed(void);
 
@@ -136,21 +130,21 @@ static void sendCommand(uint8_t data)
     can_msg_t txMessage;
 
     txMessage.id = CAN_ID_COMMAND;
-    txMessage.longitud = 1;
-    txMessage.dato[0] = data;
+    txMessage.length = 1;
+    txMessage.data[0] = data;
 
     ackReceived = false;
 
     if (can_write_msg(&txMessage) == true)
     {
-        logMessage("TX", txMessage.id, txMessage.dato, txMessage.longitud);
+        logMessage("TX", txMessage.id, txMessage.data, txMessage.length);
     }
 }
 
 /**
  * @brief  Arma una línea de texto con el prefijo (TX/RX), el ID,
- *         el DLC (longitud) y los datos del mensaje CAN en
- *         formato hexadecimal, y la envía por UART.
+ *         el DLC (length) y los datos del mensaje CAN en formato
+ *         hexadecimal, y la envía por UART.
  * @param  prefix: "TX" o "RX", para distinguir el sentido del mensaje.
  * @param  id: identificador del mensaje CAN.
  * @param  data: puntero al arreglo de datos del mensaje.
@@ -198,25 +192,25 @@ static void logTimeout(const char *action)
  *         Se ejecuta en contexto de interrupción: se limita a
  *         copiar el dato recibido y levantar banderas — nada de
  *         transmisión UART acá (interrupciones cortas).
- * @param  mensaje: puntero al mensaje CAN recibido.
+ * @param  message: puntero al mensaje CAN recibido.
  * @retval Ninguno.
  */
-void can_read_msg_callback(can_msg_t *mensaje)
+void can_read_msg_callback(can_msg_t *message)
 {
     uint8_t i;
 
-    if (mensaje->id == CAN_ID_ACK)
+    if (message->id == CAN_ID_ACK)
     {
-        ackReceivedData = mensaje->dato[0];
+        ackReceivedData = message->data[0];
         ackReceived = true;
     }
 
-    rxLogId = mensaje->id;
-    rxLogLength = mensaje->longitud;
+    rxLogId = message->id;
+    rxLogLength = message->length;
 
-    for (i = 0; i < mensaje->longitud; i++)
+    for (i = 0; i < message->length; i++)
     {
-        rxLogData[i] = mensaje->dato[i];
+        rxLogData[i] = message->data[i];
     }
 
     rxLogPending = true;
