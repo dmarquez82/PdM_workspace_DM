@@ -18,6 +18,6 @@ bool_t ldr_Init(void);
  * @param  Ninguno.
  * @retval uint16_t: valor crudo de la conversión (0 a 4095, 12 bits).
  */
-uint16_t ldr_LeerValor(void);
+uint16_t ldr_ReadValue(void);
 
 #endif

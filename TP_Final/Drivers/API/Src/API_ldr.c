@@ -1,8 +1,7 @@
 #include "API_ldr.h"
 
-// Declaraciones internas: las implementa API_ldr_port_stm32f4xx.c
 extern bool_t ldr_port_Init(void);
-extern uint16_t ldr_port_LeerValor(void);
+extern uint16_t ldr_port_ReadValue(void);
 
 /**
  * @brief  Inicializa el driver del LDR.
@@ -19,7 +18,7 @@ bool_t ldr_Init(void)
  * @param  Ninguno.
  * @retval uint16_t: valor crudo de la conversión ADC (0 a 4095).
  */
-uint16_t ldr_LeerValor(void)
+uint16_t ldr_ReadValue(void)
 {
-    return ldr_port_LeerValor();
+    return ldr_port_ReadValue();
 }

@@ -1,16 +1,16 @@
-#ifndef MEF_TABLERO_H
-#define MEF_TABLERO_H
+#ifndef MEF_KEYPAD_H
+#define MEF_KEYPAD_H
 
 /**
- * @brief  Inicializa la MEF del tablero (pulsador + CAN) y el
+ * @brief  Inicializa la MEF del teclado (pulsador + CAN) y el
  *         driver de antirrebote del que depende.
  * @param  Ninguno.
  * @retval Ninguno.
  */
-void tableroMef_init(void);
+void mef_keypad_init(void);
 
 /**
- * @brief  Actualiza la MEF del tablero: procesa el antirrebote,
+ * @brief  Actualiza la MEF del teclado: procesa el antirrebote,
  *         envía comandos por CAN al detectar una pulsación
  *         confirmada, y resuelve las transiciones de estado según
  *         la llegada (o no) del ACK correspondiente. Debe llamarse
@@ -18,6 +18,6 @@ void tableroMef_init(void);
  * @param  Ninguno.
  * @retval Ninguno.
  */
-void tableroMef_update(void);
+void mef_keypad_update(void);
 
 #endif

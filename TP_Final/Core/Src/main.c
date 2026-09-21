@@ -25,7 +25,7 @@
 #include "API_can.h"
 #include "API_uart.h"
 #include "API_ldr.h"
-#include "mef_tablero.h"
+#include "mef_keypad.h"
 #include "mef_backlight.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -116,8 +116,8 @@ int main(void)
       Error_Handler();
   }
 
-  tableroMef_init();
-  backlightMef_init();
+  mef_keypad_init();
+  mef_backlight_init();
 
   /* USER CODE END 2 */
 
@@ -132,8 +132,8 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	tableroMef_update();
-	backlightMef_update();
+	mef_keypad_update();
+	mef_backlight_update();
 
   }
   /* USER CODE END 3 */

@@ -2,35 +2,32 @@
 #include "API_ldr.h"
 #include "API_delay.h"
 
-/* Umbrales de histéresis (0 a 4095, según divisor resistivo del LDR).
-   UMBRAL_ALTO > UMBRAL_BAJO a propósito: valores de ejemplo, hay que
-   calibrarlos con el sensor real y el ambiente donde se pruebe. */
-#define UMBRAL_BAJO         1500U
-#define UMBRAL_ALTO         2000U
-#define PERIODO_LECTURA_MS  100U
+#define LOW_THRESHOLD    1500U
+#define HIGH_THRESHOLD   2000U
+#define READ_PERIOD_MS   100U
 
 typedef enum
 {
-    ESTADO_BACKLIGHT_APAGADO,
-    ESTADO_BACKLIGHT_ENCENDIDO,
-} estadoBacklight_t;
+    STATE_BACKLIGHT_OFF,
+    STATE_BACKLIGHT_ON,
+} backlightState_t;
 
-static estadoBacklight_t estadoActual;
-static delay_t delayLectura;
+static backlightState_t currentState;
+static delay_t readDelay;
 
 // Declaraciones internas: las implementa mef_backlight_port_stm32f4xx.c
-extern void backlightPort_EncenderLed(void);
-extern void backlightPort_ApagarLed(void);
+extern void backlightPort_TurnOnLed(void);
+extern void backlightPort_TurnOffLed(void);
 
 /**
  * @brief  Inicializa la MEF de backlight. Ver descripción en el header.
  * @param  Ninguno.
  * @retval Ninguno.
  */
-void backlightMef_init(void)
+void mef_backlight_init(void)
 {
-    estadoActual = ESTADO_BACKLIGHT_APAGADO;
-    delayInit(&delayLectura, PERIODO_LECTURA_MS);
+    currentState = STATE_BACKLIGHT_OFF;
+    delayInit(&readDelay, READ_PERIOD_MS);
 }
 
 /**
@@ -38,41 +35,39 @@ void backlightMef_init(void)
  * @param  Ninguno.
  * @retval Ninguno.
  */
-void backlightMef_update(void)
+void mef_backlight_update(void)
 {
-    uint16_t valorLdr;
+    uint16_t ldrValue;
 
-    if (delayRead(&delayLectura) == false)
+    if (delayRead(&readDelay) == false)
     {
         return;
     }
 
-    /* Rearma el período apenas se cumple, sin importar si delayRead
-       sigue devolviendo true en llamadas siguientes o no. */
-    delayInit(&delayLectura, PERIODO_LECTURA_MS);
+    delayInit(&readDelay, READ_PERIOD_MS);
 
-    valorLdr = ldr_LeerValor();
+    ldrValue = ldr_ReadValue();
 
-    switch (estadoActual)
+    switch (currentState)
     {
-        case ESTADO_BACKLIGHT_APAGADO:
-            if (valorLdr < UMBRAL_BAJO)
+        case STATE_BACKLIGHT_OFF:
+            if (ldrValue < LOW_THRESHOLD)
             {
-                backlightPort_EncenderLed();
-                estadoActual = ESTADO_BACKLIGHT_ENCENDIDO;
+                backlightPort_TurnOnLed();
+                currentState = STATE_BACKLIGHT_ON;
             }
             break;
 
-        case ESTADO_BACKLIGHT_ENCENDIDO:
-            if (valorLdr > UMBRAL_ALTO)
+        case STATE_BACKLIGHT_ON:
+            if (ldrValue > HIGH_THRESHOLD)
             {
-                backlightPort_ApagarLed();
-                estadoActual = ESTADO_BACKLIGHT_APAGADO;
+                backlightPort_TurnOffLed();
+                currentState = STATE_BACKLIGHT_OFF;
             }
             break;
 
         default:
-            estadoActual = ESTADO_BACKLIGHT_APAGADO;
+            currentState = STATE_BACKLIGHT_OFF;
             break;
     }
 }
