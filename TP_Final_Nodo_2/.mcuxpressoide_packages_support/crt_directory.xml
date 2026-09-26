@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?debugstack-directory version="1.0"?>
+<directory xmlns:xi="http://www.w3.org/2001/XInclude">
+   <xi:include href="file:/C:/Users/Usuario/Downloads/CESE%20Shield%20MCXC444%20CAN/SD2_MCXC444_CAN/.mcuxpressoide_packages_support/MCXC444_support/MCXC444_dir_part.xml"/>
+   <xi:include href="file:/C:/Users/Usuario/Downloads/CESE%20Shield%20MCXC444%20CAN/SD2_MCXC444_CAN/.mcuxpressoide_packages_support/MKL46Z256xxx4_support/KL4x_dir_part.xml"/>
+</directory>
