@@ -1,6 +1,10 @@
 /* Copyright 2026, DSI FCEIA UNR - Sistemas Digitales 2
  *    DSI: http://www.dsi.fceia.unr.edu.ar/
  * Copyright 2026, Agustin M. Zuliani (amzuliani02@gmail.com)
+ * Modificado por el Prof. Ing. Daniel Márquez para su trabajo Final de las
+ * asignaturas Programación de microprocesadores y Protocolos de comunicación
+ * en sistemas embebidos. (dmarquez@fceia.unr.edu.ar)
+ *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
