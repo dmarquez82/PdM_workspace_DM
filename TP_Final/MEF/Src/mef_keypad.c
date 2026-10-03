@@ -154,14 +154,46 @@ static void sendCommand(uint8_t data)
 static void logMessage(const char *prefix, uint32_t id, uint8_t *data, uint8_t length)
 {
     char buffer[96];
+    int written;
     uint16_t position;
     uint8_t i;
 
-    position = (uint16_t)sprintf(buffer, "%s - ID: 0x%03lX - DLC: %d - Datos:", prefix, id, length);
+    written = sprintf(buffer, "%s - ID: 0x%03lX - DLC: %d - Datos:", prefix, id, length);
+
+    /* sprintf() devuelve la cantidad de caracteres que escribiría en un
+       buffer infinito, no lo que realmente entró en 'buffer'. Si ese
+       valor supera el tamaño real, el mensaje quedó truncado y seguir
+       escribiendo desde 'position' escribiría fuera del arreglo
+       (memoria de otras variables). Por eso cortamos acá en vez de
+       continuar con un índice que ya no es seguro. */
+    if (written < 0 || (uint16_t)written >= sizeof(buffer))
+    {
+        return;
+    }
+
+    position = (uint16_t)written;
 
     for (i = 0; i < length; i++)
     {
-        position = position + (uint16_t)sprintf(&buffer[position], " 0x%02X", data[i]);
+        written = sprintf(&buffer[position], " 0x%02X", data[i]);
+
+        /* Mismo riesgo que arriba, pero ahora dentro del loop: con
+           longitud 8 nunca debería pasar, pero si el formato de log
+           cambia en el futuro (prefijos más largos, por ejemplo),
+           este chequeo es lo que evita el desborde silencioso. */
+        if (written < 0 || (position + (uint16_t)written) >= sizeof(buffer))
+        {
+            return;
+        }
+
+        position = position + (uint16_t)written;
+    }
+
+    /* Reservamos 2 bytes para "\r\n": si no entran, mejor no enviar
+       el log incompleto que arriesgar escribir pasado el buffer. */
+    if (position + 2 >= sizeof(buffer))
+    {
+        return;
     }
 
     buffer[position] = '\r';
@@ -181,10 +213,20 @@ static void logMessage(const char *prefix, uint32_t id, uint8_t *data, uint8_t l
 static void logTimeout(const char *action)
 {
     char buffer[64];
-    uint16_t length;
+    int written;
 
-    length = (uint16_t)sprintf(buffer, "TIMEOUT - No hubo respuesta (ACK %s)\r\n", action);
-    uartSendStringSize((uint8_t *)buffer, length);
+    written = sprintf(buffer, "TIMEOUT - No hubo respuesta (ACK %s)\r\n", action);
+
+    /* Mismo motivo que en logMessage(): si el texto formateado no
+       entró completo en 'buffer', 'written' va a ser mayor o igual
+       al tamaño del arreglo, y no hay que tratar ese contenido como
+       válido para enviarlo por UART. */
+    if (written < 0 || (uint16_t)written >= sizeof(buffer))
+    {
+        return;
+    }
+
+    uartSendStringSize((uint8_t *)buffer, (uint16_t)written);
 }
 
 /**
